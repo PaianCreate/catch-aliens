@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Catch Aliens</title>
+<link rel="icon" id="favicon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Pixelify+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ===== 像素風色票 ===== */
+  :root {
+    --sky: #121547;
+    --line: #231a4f;
+    --cream: #fff6e3;
+    --cream2: #f1e3c6;
+    --pink: #ff7aa8;
+    --pink-d: #e0457b;
+    --mint: #6ee7a0;
+    --mint-d: #2fa866;
+    --cyan: #5ad1e6;
+    --yellow: #ffd84a;
+    --purple: #7b5cd6;
+    --muted: #7a6f9a;
+    --px: 'Press Start 2P', ui-monospace, monospace;
+    --pf: 'Pixelify Sans', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sky); color: var(--line); font-family: var(--pf); -webkit-font-smoothing: none; }
+  canvas#game { position: fixed; left: 0; top: 0; display: block; image-rendering: pixelated; }
+  .hidden { display: none !important; }
+  .invisible { visibility: hidden !important; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ===== 像素視窗（米白底＋粉紅標題列） ===== */
+  .win { background: var(--cream); border: 3px solid var(--line); box-shadow: 6px 6px 0 rgba(8, 6, 30, .55); }
+  .win .bar { display: flex; align-items: center; gap: 5px; background: var(--pink); border-bottom: 3px solid var(--line); padding: 7px 10px; font-family: var(--px); font-size: 9px; color: var(--line); }
+  .win .bar i { display: block; width: 9px; height: 9px; background: var(--cream); border: 2px solid var(--line); }
+  .win .bar span { flex: 1; margin-left: 6px; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .win .bar button { background: none; border: 0; font-family: var(--px); font-size: 9px; color: var(--line); padding: 2px 4px; }
+  .win .bar button:hover { color: var(--cream); }
+
+  /* 像素按鈕 */
+  .btn { font-family: var(--px); font-size: 13px; letter-spacing: 1px; color: var(--line); background: var(--mint); border: 3px solid var(--line); padding: 12px 18px; box-shadow: inset -4px -4px 0 rgba(0,0,0,.15), inset 4px 4px 0 rgba(255,255,255,.45), 0 4px 0 var(--line); transition: transform .06s; }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(3px); box-shadow: inset -4px -4px 0 rgba(0,0,0,.15), inset 4px 4px 0 rgba(255,255,255,.45), 0 1px 0 var(--line); }
+  .btn.wide { width: 100%; padding: 15px; font-size: 15px; }
+
+  /* ===== HUD（街機風） ===== */
+  #hud { position: fixed; top: 16px; left: 18px; z-index: 10; display: flex; gap: 28px; pointer-events: none; }
+  #hud .lbl { display: block; font-family: var(--px); font-size: 9px; color: var(--pink); letter-spacing: 1px; margin-bottom: 6px; text-shadow: 2px 2px 0 #000; }
+  #hud .val { display: flex; align-items: center; gap: 8px; font-family: var(--px); font-size: 20px; color: var(--yellow); text-shadow: 3px 3px 0 #000; }
+  #hud img { width: 30px; image-rendering: pixelated; }
+  #hud .bump { animation: bump .4s steps(4); }
+  @keyframes bump { 0% { transform: scale(1.6); } 100% { transform: scale(1); } }
+
+  /* ===== 攝影機小視窗 ===== */
+  #cam { position: fixed; right: 16px; bottom: 16px; width: 200px; z-index: 10; }
+  #cam .cam-body { position: relative; height: 140px; background: #000; overflow: hidden; }
+  #cam video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); opacity: .9; }
+  #cam .guide { position: absolute; left: 50%; top: 50%; width: 44%; height: 72%; transform: translate(-50%, -50%); border: 2px dashed rgba(255,246,227,.75); border-radius: 50%; pointer-events: none; }
+  #cam em { font-style: normal; font-size: 8px; }
+  #cam.ok .bar { background: var(--mint); }
+  #cam.lost .bar { background: #ff6b6b; }
+
+  /* ===== 中央提示（對準、校正） ===== */
+  #center { position: fixed; left: 50%; top: 46%; transform: translate(-50%, -50%); text-align: center; z-index: 9; pointer-events: none; width: min(600px, calc(100vw - 32px)); }
+  #center h2 { margin: 0 0 14px; font-family: var(--px); font-size: 20px; line-height: 1.5; color: var(--yellow); text-shadow: 3px 3px 0 #000; }
+  #center p { margin: 0; font-size: 20px; line-height: 1.5; color: #ece6ff; text-shadow: 2px 2px 0 #000; }
+  #center .num { display: inline-block; margin-top: 12px; font-family: var(--px); font-size: 40px; color: var(--mint); text-shadow: 4px 4px 0 #000; }
+
+  /* ===== 伸展姿勢卡 ===== */
+  #card { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 11; width: min(700px, calc(100vw - 32px)); }
+  #card .card-body { display: flex; gap: 16px; align-items: center; padding: 14px 18px 14px 14px; }
+  #card canvas { width: 168px; height: 140px; flex: none; image-rendering: pixelated; border: 3px solid var(--line); }
+  #card .txt { flex: 1; min-width: 0; }
+  #card h3 { margin: 0 0 4px; font-size: 27px; font-weight: 700; line-height: 1.15; }
+  #card p { margin: 0; font-size: 17px; line-height: 1.35; }
+  #card .muscle { margin-top: 6px; font-size: 14px; color: var(--muted); }
+  #card .muscle b { color: var(--pink-d); font-weight: 600; }
+  #card .meter { position: relative; height: 16px; margin-top: 10px; border: 3px solid var(--line); background: var(--cream2); }
+  #card .meter i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--cyan); box-shadow: inset 0 3px 0 rgba(255,255,255,.5); }
+  #card .meter.hit i { background: var(--mint); }
+  #card .meter u { position: absolute; top: -3px; bottom: -3px; width: 3px; background: var(--line); left: 83%; }
+  #card .breath { margin-top: 8px; font-size: 17px; font-weight: 600; color: var(--mint-d); min-height: 22px; }
+  #card .count { flex: none; min-width: 84px; text-align: center; font-family: var(--px); font-size: 34px; color: var(--line); }
+  #card .count.dim { color: var(--muted); opacity: .45; }
+  #card .count.tick { animation: bump .3s steps(3); }
+
+  /* ===== 衝刺關 HUD ===== */
+  #rushHud { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 12; display: flex; gap: 26px; align-items: flex-end; pointer-events: none; text-align: center; }
+  #rushHud .lbl { display: block; font-family: var(--px); font-size: 10px; color: var(--pink); text-shadow: 2px 2px 0 #000; margin-bottom: 6px; }
+  #rushHud b { font-family: var(--px); font-size: 30px; color: var(--yellow); text-shadow: 3px 3px 0 #000; }
+  #rushHud .title { font-family: var(--px); font-size: 14px; color: var(--mint); text-shadow: 3px 3px 0 #000; padding-bottom: 6px; }
+  #rushHud .low b { color: #ff6b6b; }
+  .pop.combo { font-size: 20px; color: var(--pink); }
+
+  /* ===== 浮動提示、彈出字 ===== */
+  #toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -10px); z-index: 12; padding: 9px 16px; font-size: 17px; font-weight: 600; color: var(--yellow); background: var(--line); border: 3px solid var(--cream); box-shadow: 4px 4px 0 rgba(0,0,0,.45); opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .pop { position: fixed; z-index: 13; transform: translate(-50%, -50%); font-family: var(--px); font-size: 18px; color: var(--yellow); text-shadow: 3px 3px 0 #000; pointer-events: none; white-space: nowrap; animation: popUp 1.2s ease-out forwards; }
+  .pop.big { font-size: 26px; color: var(--mint); }
+  .pop.lock { font-size: 30px; color: var(--yellow); text-shadow: 4px 4px 0 var(--pink-d), 7px 7px 0 #000; }
+  @keyframes popUp {
+    0% { transform: translate(-50%, -50%) scale(.4); opacity: 0; }
+    12% { transform: translate(-50%, -50%) scale(1.3); opacity: 1; }
+    24% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    70% { transform: translate(-50%, -80%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -140%) scale(1); opacity: 0; }
+  }
+
+  /* ===== 全螢幕面板 ===== */
+  .overlay { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 6, 30, .45); overflow-y: auto; }
+  .win-body { padding: 20px 24px 20px; }
+
+  /* 教學分頁 */
+  .onboard { width: min(520px, 100%); text-align: center; }
+  .slide { display: none; }
+  .slide.on { display: flex; flex-direction: column; justify-content: center; min-height: 330px; animation: slideIn .25s steps(4); }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+  .slide h1 { margin: 2px 0 10px; font-family: var(--px); font-size: clamp(20px, 5vw, 26px); line-height: 1.4; color: var(--pink); text-shadow: 3px 3px 0 var(--line); }
+  .slide h2 { margin: 2px 0 8px; font-size: 30px; font-weight: 700; line-height: 1.1; }
+  .slide .lead { margin: 0; font-size: 19px; line-height: 1.45; }
+  .slide .lead b { color: var(--mint-d); }
+  .slide .fine { margin: 12px 0 0; font-size: 15px; color: var(--muted); }
+  .demo { display: block; width: 100%; max-width: 374px; aspect-ratio: 187 / 100; margin: 0 auto 16px; image-rendering: pixelated; border: 3px solid var(--line); background: var(--sky); }
+  .seg { display: flex; gap: 10px; margin: 6px 0 16px; }
+  .seg button { flex: 1; padding: 12px 0; font-family: var(--px); font-size: 15px; color: var(--line); background: var(--cream2); border: 3px solid var(--line); box-shadow: 0 4px 0 var(--line); }
+  .seg button small { font-size: 8px; margin-left: 3px; }
+  .seg button.on { background: var(--yellow); transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+  .nav { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; }
+  .nav .back { min-width: 80px; background: none; border: 0; font-family: var(--px); font-size: 10px; color: var(--muted); padding: 10px 0; text-align: left; }
+  .nav .back:hover { color: var(--line); }
+  .nav .btn { min-width: 80px; padding: 10px 14px; font-size: 11px; }
+  .dots { display: flex; gap: 6px; }
+  .dots i { width: 10px; height: 10px; background: var(--cream2); border: 2px solid var(--line); transition: width .15s steps(3); }
+  .dots i.on { width: 24px; background: var(--pink); }
+
+  /* 開始頁：連續天數、暖身開關、小按鈕 */
+  .streak { margin: 0 0 12px; font-size: 17px; font-weight: 600; color: var(--pink-d); }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; font-size: 17px; cursor: pointer; user-select: none; }
+  .toggle input { appearance: none; width: 20px; height: 20px; margin: 0; border: 3px solid var(--line); background: var(--cream2); cursor: pointer; }
+  .toggle input:checked { background: var(--mint); box-shadow: inset 0 0 0 3px var(--cream2); }
+  .toggle small { color: var(--muted); font-size: 14px; }
+  .links { display: flex; justify-content: center; gap: 10px; margin-top: 12px; }
+  .ghost { font-family: var(--px); font-size: 9px; color: var(--line); background: var(--cream2); border: 3px solid var(--line); padding: 8px 10px; box-shadow: 0 3px 0 var(--line); }
+  .ghost:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+
+  /* 圖鑑 */
+  #codex { z-index: 25; }
+  .codex { width: min(560px, 100%); }
+  .codex .found { text-align: center; margin: 0 0 14px; font-size: 17px; color: var(--muted); }
+  .codex .found b { font-family: var(--px); font-size: 14px; color: var(--line); }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .cell { text-align: center; padding: 10px 6px 8px; background: var(--cream2); border: 3px solid var(--line); }
+  .cell.gold { background: #fff1c2; }
+  .cell canvas { width: 75px; height: 66px; image-rendering: pixelated; display: block; margin: 0 auto 6px; }
+  .cell .nm { font-size: 15px; font-weight: 600; line-height: 1.2; }
+  .cell .ct { margin-top: 4px; font-family: var(--px); font-size: 9px; color: var(--muted); }
+  .cell.locked .nm { color: var(--muted); }
+  .bar .x { margin-left: auto; }
+
+  /* 結算 */
+  .result { width: min(560px, 100%); }
+  .result h1 { margin: 0 0 4px; font-family: var(--px); font-size: 20px; line-height: 1.5; color: var(--pink); text-shadow: 3px 3px 0 var(--line); text-align: center; }
+  .result .sub { margin: 0 0 16px; text-align: center; font-size: 17px; color: var(--muted); }
+  .big { display: flex; gap: 12px; margin-bottom: 18px; }
+  .big div { flex: 1; text-align: center; padding: 14px 8px 12px; background: var(--cream2); border: 3px solid var(--line); }
+  .big b { display: block; font-family: var(--px); font-size: 26px; margin-bottom: 8px; }
+  .big span { font-size: 15px; color: var(--muted); }
+  .label { font-size: 15px; color: var(--muted); margin-bottom: 8px; }
+  .rows { display: grid; gap: 8px; margin-bottom: 18px; }
+  .row { display: grid; grid-template-columns: 96px 1fr 70px; gap: 10px; align-items: center; font-size: 16px; }
+  .row .bar2 { height: 14px; border: 3px solid var(--line); background: var(--cream2); }
+  .row .bar2 i { display: block; height: 100%; background: var(--cyan); }
+  .row .v { text-align: right; font-family: var(--px); font-size: 10px; }
+  .row .v.up { color: var(--mint-d); }
+  .res-streak { text-align: center; margin: -6px 0 14px; font-size: 18px; font-weight: 700; color: var(--pink-d); }
+  .newfound { text-align: center; margin: 0 0 14px; padding: 8px; background: #fff1c2; border: 3px dashed var(--line); font-size: 16px; font-weight: 600; }
+  #trend { display: block; width: 100%; height: 96px; image-rendering: pixelated; border: 3px solid var(--line); background: var(--cream2); }
+  .trend-cap { margin: 6px 0 18px; font-size: 15px; color: var(--muted); }
+  .trend-cap b { color: var(--mint-d); }
+  .res-btns { display: flex; gap: 10px; }
+  .res-btns .btn { flex: 1; }
+  .tip { font-size: 17px; line-height: 1.45; padding: 12px 14px; background: #e3fbe9; border: 3px solid var(--mint-d); margin-bottom: 18px; }
+
+  /* ===== 調參、靜音 ===== */
+  .sq { position: fixed; bottom: 16px; z-index: 30; width: 40px; height: 40px; font-size: 16px; color: var(--line); background: var(--cream); border: 3px solid var(--line); box-shadow: 3px 3px 0 rgba(0,0,0,.45); }
+  #gear { left: 16px; }
+  #mute { left: 64px; }
+  #panel { position: fixed; left: 16px; bottom: 68px; z-index: 30; width: 290px; max-height: calc(100vh - 100px); overflow-y: auto; }
+  #panel .win-body { padding: 12px 14px; font-size: 14px; }
+  #panel label { display: grid; grid-template-columns: 1fr 50px; gap: 2px 8px; margin-bottom: 8px; }
+  #panel input { grid-column: 1 / 3; width: 100%; accent-color: var(--pink-d); }
+  #panel output { text-align: right; font-family: var(--px); font-size: 9px; padding-top: 3px; }
+  #panel .read { font-family: ui-monospace, monospace; font-size: 11px; color: var(--muted); line-height: 1.6; margin: 6px 0 10px; white-space: pre; }
+  #panel .btn { width: 100%; padding: 8px; font-size: 9px; }
+
+  @media (max-width: 700px) {
+    #cam { width: 120px; bottom: auto; top: 12px; right: 12px; }
+    #cam .cam-body { height: 84px; }
+    #hud { top: 12px; left: 12px; gap: 18px; }
+    #card .card-body { flex-wrap: wrap; justify-content: center; gap: 10px; padding: 12px; }
+    #card canvas { width: 132px; height: 110px; }
+    #card .txt { flex-basis: 100%; text-align: center; order: 3; }
+    #card .count { min-width: 0; font-size: 26px; }
+    #card h3 { font-size: 22px; }
+    .sq { bottom: auto; top: 76px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- 左上 HUD -->
+<div id="hud" class="hidden">
+  <div><span class="lbl">CAUGHT</span><span class="val"><img id="hudIcon" alt=""><b id="caught">0</b></span></div>
+  <div><span class="lbl">TIME</span><span class="val"><b id="timer">3:00</b></span></div>
+</div>
+
+<!-- 右下攝影機 -->
+<div id="cam" class="win hidden">
+  <div class="bar"><i></i><span>CAM</span><em id="camTag">…</em></div>
+  <div class="cam-body"><video id="video" playsinline muted></video><div class="guide"></div></div>
+</div>
+
+<!-- 衝刺關 HUD -->
+<div id="rushHud" class="hidden">
+  <div><span class="lbl">TIME</span><b id="rushTime">10</b></div>
+  <div class="title" id="rushTitle">ALIEN RUSH!</div>
+  <div><span class="lbl">CAUGHT</span><b id="rushCount">0</b></div>
+</div>
+
+<!-- 中央提示 -->
+<div id="center" class="hidden"><h2 id="centerTitle"></h2><p id="centerSub"></p></div>
+
+<!-- 伸展姿勢卡 -->
+<div id="card" class="win hidden">
+  <div class="bar"><i></i><i></i><i></i><span id="cardStep"></span><button id="skipBtn">SKIP ›</button></div>
+  <div class="card-body">
+    <canvas id="avatar" width="120" height="100"></canvas>
+    <div class="txt">
+      <h3 id="cardTitle"></h3>
+      <p id="cardTip"></p>
+      <div class="muscle" id="cardMuscle"></div>
+      <div class="meter" id="meter"><i id="meterFill"></i><u id="meterMark"></u></div>
+      <div class="breath" id="cardBreath"></div>
+    </div>
+    <div class="count" id="cardCount"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- 一頁一步的教學 -->
+<section id="intro" class="overlay">
+  <div class="win onboard">
+    <div class="bar"><i></i><i></i><i></i><span>HOW TO PLAY</span><button id="skipTut">SKIP ›</button></div>
+    <div class="win-body">
+      <div class="slide on">
+        <canvas class="demo" data-demo="ufo" width="187" height="100"></canvas>
+        <h1>CATCH<br>ALIENS</h1>
+        <p class="lead">A quick neck break.<br>Fly a UFO with your head.</p>
+      </div>
+      <div class="slide">
+        <canvas class="demo" data-demo="steer" width="187" height="100"></canvas>
+        <h2>Turn your head to fly</h2>
+        <p class="lead">Look left, right, up or down.<br>Face forward to stop.</p>
+      </div>
+      <div class="slide">
+        <canvas class="demo" data-demo="hold" width="187" height="100"></canvas>
+        <h2>Hold the stretch</h2>
+        <p class="lead">Reach an alien, then copy the pose.<br>Hold it <b class="holdSec">12</b> seconds to beam it up.</p>
+        <p class="fine">Every 2 stretches: <b>ALIEN RUSH!</b> Grab as many as you can in 10 seconds.</p>
+      </div>
+      <div class="slide">
+        <canvas class="demo" data-demo="easy" width="187" height="100"></canvas>
+        <h2>Go easy</h2>
+        <p class="lead">Stretch until it feels tight, never painful.<br>Feel dizzy or numb? Stop.</p>
+        <p class="fine">Have a neck injury? Ask your doctor first.</p>
+      </div>
+      <div class="slide">
+        <canvas class="demo" data-demo="ready" width="187" height="100"></canvas>
+        <h2>How long?</h2>
+        <p class="streak" id="streakLine"></p>
+        <div class="seg" id="durSeg">
+          <button data-m="1">1<small>MIN</small></button>
+          <button data-m="3" class="on">3<small>MIN</small></button>
+          <button data-m="5">5<small>MIN</small></button>
+        </div>
+        <label class="toggle"><input type="checkbox" id="warmChk"> Warm-up first <small>(~30s)</small></label>
+        <button class="btn wide" id="startBtn">START ▶</button>
+        <div class="links">
+          <button class="ghost" id="codexBtn">📖 COLLECTION</button>
+          <button class="ghost" id="howBtn">? HOW TO PLAY</button>
+        </div>
+        <p class="fine">🔒 Your camera stays on your device. Nothing is uploaded.</p>
+      </div>
+      <div class="nav">
+        <button class="back" id="tutBack">‹ BACK</button>
+        <div class="dots" id="tutDots"></div>
+        <button class="btn" id="tutNext">NEXT</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 暫停（臉離開鏡頭） -->
+<section id="pause" class="overlay hidden">
+  <div class="win" style="width:min(400px,100%); text-align:center">
+    <div class="bar"><i></i><i></i><i></i><span>PAUSED</span></div>
+    <div class="win-body" style="font-size:19px; line-height:1.5">Can't see your face.<br>Come back to continue.</div>
+  </div>
+</section>
+
+<!-- 結算 -->
+<section id="result" class="overlay hidden">
+  <div class="win result">
+    <div class="bar"><i></i><i></i><i></i><span>MISSION REPORT</span></div>
+    <div class="win-body">
+      <h1>MISSION<br>COMPLETE!</h1>
+      <p class="sub" id="resSub"></p>
+      <p class="res-streak" id="resStreak"></p>
+      <div class="newfound hidden" id="resNew"></div>
+      <div class="big">
+        <div><b id="resCaught">0</b><span>Total caught</span></div>
+        <div><b id="resHold">0</b><span>Seconds stretched</span></div>
+      </div>
+      <div class="label">Your range today (vs. last time)</div>
+      <div class="rows" id="resRows"></div>
+      <div class="label">Your neck range over time</div>
+      <canvas id="trend" width="200" height="60"></canvas>
+      <p class="trend-cap" id="trendCap"></p>
+      <div class="tip" id="resTip"></div>
+      <div class="res-btns">
+        <button class="ghost" id="codexBtn2">📖 COLLECTION</button>
+        <button class="btn" id="againBtn">PLAY AGAIN ▶</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 圖鑑 -->
+<section id="codex" class="overlay hidden">
+  <div class="win codex">
+    <div class="bar"><i></i><i></i><i></i><span>COLLECTION</span><button class="x" id="codexClose">✕ CLOSE</button></div>
+    <div class="win-body">
+      <p class="found" id="codexFound"></p>
+      <div class="grid" id="codexGrid"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 調參、靜音 -->
+<button id="gear" class="sq" title="Sensitivity">⚙</button>
+<button id="mute" class="sq" title="Sound on/off">♪</button>
+<div id="panel" class="win hidden">
+  <div class="bar"><i></i><span>SENSITIVITY</span></div>
+  <div class="win-body">
+    <div id="sliders"></div>
+    <div class="read" id="readout"></div>
+    <button class="btn" id="resetCfg">RESET</button>
+  </div>
+</div>
+
+<script type="module">
+// =====================================================================
+//  Catch Aliens — 用頭部姿勢駕駛飛碟、做頸部伸展的小遊戲（像素風版）
+//  網址加 ?sim=1 可用鍵盤模擬頭部（方向鍵轉頭／低頭、A D 側彎、S 收下巴、F 模擬臉離開）
+// =====================================================================
+
+// ---------- 可調參數（角度都是「相對正中姿勢」的度數） ----------
+const DEFAULTS = {
+  hold: 12,       // 每次伸展要維持幾秒
+  turn: 35,       // 左右轉頭目標角度
+  tilt: 20,       // 耳朵靠肩（側彎）目標角度
+  down: 25,       // 低頭目標角度
+  levYaw: 25,     // 鼻子看腋下：轉頭角度
+  levDown: 15,    // 鼻子看腋下：低頭角度
+  dead: 7,        // 飛行死區：轉頭小於這個角度飛碟不動
+  full: 20,       // 飛行全速角度
+  speed: 320,     // 飛碟最高速度（px/秒）
+  tuck: 0.965,    // 收下巴判定：臉縮小到正中時的幾倍
+  assist: 0.75,   // 一直做不到時，目標最低降到幾成
+  alienSpeed: 90, // 外星人亂跑的速度（px/秒），0 = 不動
+  lockTime: 0.4,  // 鎖定後滑到正中間花幾秒
+  struggle: 1.5,  // 外星人掙扎幅度（0 = 不動）
+  suckTime: 0.45, // 吸進飛碟花幾秒
+  bounce: 1.5,    // 飛碟果凍彈跳強度
+};
+const SLIDERS = [
+  ['hold', 'Hold time (s)', 8, 30, 1],
+  ['turn', 'Turn angle', 15, 60, 1],
+  ['tilt', 'Tilt angle', 10, 40, 1],
+  ['down', 'Look-down angle', 10, 45, 1],
+  ['levYaw', 'Armpit: turn', 10, 45, 1],
+  ['levDown', 'Armpit: down', 8, 35, 1],
+  ['dead', 'Flight dead zone', 3, 15, 1],
+  ['full', 'Full-speed angle', 10, 35, 1],
+  ['speed', 'UFO speed', 150, 600, 10],
+  ['alienSpeed', 'Alien speed', 0, 220, 10],
+  ['lockTime', 'Lock slide time (s)', 0.15, 1.2, 0.05],
+  ['struggle', 'Alien struggle', 0, 2.5, 0.1],
+  ['suckTime', 'Swallow time (s)', 0.2, 1.2, 0.05],
+  ['bounce', 'UFO bounce', 0, 2.5, 0.1],
+  ['tuck', 'Chin tuck sensitivity', 0.9, 0.99, 0.005],
+];
+const CFG = { ...DEFAULTS };
+// 預設值改版時，舊的儲存值不覆蓋這次調整的項目
+// 每次改預設值就加一版，並列出那一版改了哪些項目
+const CFG_VER = 3, CFG_CHANGES = { 2: ['struggle', 'bounce'], 3: ['hold'] };
+try {
+  const saved = JSON.parse(localStorage.getItem('catchAliens.cfg') || '{}');
+  const from = saved._v || 1;
+  for (let v = from + 1; v <= CFG_VER; v++) (CFG_CHANGES[v] || []).forEach(k => delete saved[k]);
+  delete saved._v; Object.assign(CFG, saved);
+} catch {}
+const saveCfg = () => { try { localStorage.setItem('catchAliens.cfg', JSON.stringify({ ...CFG, _v: CFG_VER })); } catch {} };
+
+const SIM = new URLSearchParams(location.search).has('sim');
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = k => k * k * (3 - 2 * k);
+const DEG = 180 / Math.PI;
+
+// ---------- 伸展動作資料 ----------
+// ratio(s) 回傳「目前做到目標的幾成」，>= 1 代表到位
+const POSES = {
+  turnL: { title: 'Turn left', tip: 'Chin level. Look over your left shoulder.', muscle: 'Side of neck',
+           ratio: s => -s.yaw / CFG.turn, target: () => ({ yaw: -CFG.turn }) },
+  turnR: { title: 'Turn right', tip: 'Chin level. Look over your right shoulder.', muscle: 'Side of neck',
+           ratio: s => s.yaw / CFG.turn, target: () => ({ yaw: CFG.turn }) },
+  tiltL: { title: 'Left ear to shoulder', tip: 'Keep your shoulders down. No shrugging.', muscle: 'Right side of neck',
+           ratio: s => -s.roll / CFG.tilt, target: () => ({ roll: -CFG.tilt }) },
+  tiltR: { title: 'Right ear to shoulder', tip: 'Keep your shoulders down. No shrugging.', muscle: 'Left side of neck',
+           ratio: s => s.roll / CFG.tilt, target: () => ({ roll: CFG.tilt }) },
+  levL:  { title: 'Nose to left armpit', tip: 'Turn left a little, then look down.', muscle: 'Right neck–shoulder corner',
+           ratio: s => Math.min(-s.yaw / CFG.levYaw, -s.pitch / CFG.levDown), target: () => ({ yaw: -CFG.levYaw, pitch: -CFG.levDown * 1.3 }) },
+  levR:  { title: 'Nose to right armpit', tip: 'Turn right a little, then look down.', muscle: 'Left neck–shoulder corner',
+           ratio: s => Math.min(s.yaw / CFG.levYaw, -s.pitch / CFG.levDown), target: () => ({ yaw: CFG.levYaw, pitch: -CFG.levDown * 1.3 }) },
+  down:  { title: 'Chin to chest', tip: 'Let your head hang gently.', muscle: 'Back of neck',
+           ratio: s => -s.pitch / CFG.down, target: () => ({ pitch: -CFG.down }) },
+};
+
+// ---------- 狀態 ----------
+const S = {
+  phase: 'intro', phaseT: 0, paused: false,
+  duration: 180, remain: 180,
+  caught: 0,
+  ufo: { x: 0, y: 0, vx: 0, vy: 0, tilt: 0, charge: 0, squash: 0 },
+  alien: null, bag: [], pose: null,
+  hold: 0, missT: 0, assist: 1, retT: 0, beamT: 0,
+  face: false, lostT: 0,
+  raw: null, neutral: null, calib: [],
+  ang: { yaw: 0, pitch: 0, roll: 0, scale: 1 },
+  holdSec: {}, max: { turnL: 0, turnR: 0, tiltL: 0, tiltR: 0, down: 0 },
+  particles: [], sparks: [], focus: 0, flash: 0,
+};
+
+// =====================================================================
+//  頭部姿勢偵測（MediaPipe Face Landmarker）
+// =====================================================================
+const video = $('video');
+let landmarker = null, lastVideoTime = -1;
+
+async function startTracking() {
+  $('camTag').textContent = 'STARTING';
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+  video.srcObject = stream;
+  await video.play();
+  $('camTag').textContent = 'LOADING';
+  const { FaceLandmarker, FilesetResolver } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const fileset = await FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  const opts = delegate => ({
+    baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task', delegate },
+    runningMode: 'VIDEO', numFaces: 1,
+  });
+  try { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('GPU')); }
+  catch { landmarker = await FaceLandmarker.createFromOptions(fileset, opts('CPU')); } // GPU 不行就退回 CPU
+}
+
+// 由臉部 3D 特徵點算出頭的轉向（鏡像座標：使用者往左 = 畫面往左）
+function poseFromLandmarks(lm, W, H) {
+  const P = i => ({ x: (1 - lm[i].x) * W, y: lm[i].y * H, z: lm[i].z * W });
+  const a = P(234), b = P(454);           // 兩側臉頰（a 在畫面右）
+  const top = P(10), chin = P(152);       // 額頭、下巴
+  const e1 = P(33), e2 = P(263);          // 兩眼外眼角
+  const xa = { x: a.x - b.x, y: a.y - b.y, z: a.z - b.z };
+  const ya = { x: chin.x - top.x, y: chin.y - top.y, z: chin.z - top.z };
+  // 臉朝向 = -(xa × ya)
+  let f = { x: -(xa.y * ya.z - xa.z * ya.y), y: -(xa.z * ya.x - xa.x * ya.z), z: -(xa.x * ya.y - xa.y * ya.x) };
+  const n = Math.hypot(f.x, f.y, f.z) || 1; f = { x: f.x / n, y: f.y / n, z: f.z / n };
+  const nose = P(1);
+  return {
+    yaw: Math.atan2(f.x, -f.z) * DEG,                       // 負 = 往左
+    pitch: Math.asin(clamp(-f.y, -1, 1)) * DEG,             // 正 = 抬頭
+    roll: Math.atan2(e1.y - e2.y, e1.x - e2.x) * DEG,       // 正 = 右耳靠右肩
+    scale: Math.hypot(xa.x, xa.y, xa.z),                    // 臉寬（收下巴時變小）
+    cx: nose.x / W, cy: nose.y / H, w: Math.hypot(xa.x, xa.y) / W,
+  };
+}
+
+function detect(now) {
+  if (SIM) { simStep(); return; }
+  if (!landmarker || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+  lastVideoTime = video.currentTime;
+  const res = landmarker.detectForVideo(video, now);
+  const lm = res.faceLandmarks && res.faceLandmarks[0];
+  if (lm) {
+    const p = poseFromLandmarks(lm, video.videoWidth, video.videoHeight);
+    // 平滑處理，避免抖動
+    if (!S.raw) S.raw = p;
+    else for (const k of ['yaw', 'pitch', 'roll', 'scale']) S.raw[k] = lerp(S.raw[k], p[k], 0.4);
+    Object.assign(S.raw, { cx: p.cx, cy: p.cy, w: p.w });
+    S.face = true; S.lostT = 0;
+  } else S.face = false;
+}
+
+// ---------- 鍵盤模擬模式 ----------
+const keys = {};
+const sim = { yaw: 0, pitch: 0, roll: 0, scale: 1, face: true };
+if (SIM) {
+  addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if (e.key.toLowerCase() === 'f') sim.face = !sim.face; if (e.key.startsWith('Arrow') && S.phase !== 'intro') e.preventDefault(); });
+  addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+}
+function simStep() {
+  const dt = 1 / 60, go = (v, t, sp) => v + clamp(t - v, -sp * dt, sp * dt);
+  sim.yaw = go(sim.yaw, keys.arrowleft ? -45 : keys.arrowright ? 45 : 0, 60);
+  sim.pitch = go(sim.pitch, keys.arrowup ? 25 : keys.arrowdown ? -35 : 0, 60);
+  sim.roll = go(sim.roll, keys.a ? -30 : keys.d ? 30 : 0, 50);
+  sim.scale = go(sim.scale, keys.s ? 0.93 : 1, 0.2);
+  S.raw = { ...sim, cx: 0.5, cy: 0.45, w: 0.3 };
+  S.face = sim.face;
+}
+
+// =====================================================================
+//  像素畫布：先畫在 1/PX 大小的畫布，再用 pixelated 放大
+//  遊戲邏輯一律用 CSS px 座標，畫的時候才用 q() 換成像素格
+// =====================================================================
+const cv = $('game');
+let ctx = cv.getContext('2d');
+let W = 0, H = 0, U = 1, PX = 3, LW = 0, LH = 0;
+const q = v => Math.round(v / PX);
+
+function resize() {
+  W = innerWidth; H = innerHeight;
+  PX = W < 700 ? 2 : 3;                    // 像素顆粒：手機 2、桌機 3（夠細）
+  LW = Math.ceil(W / PX); LH = Math.ceil(H / PX);
+  cv.width = LW; cv.height = LH;
+  cv.style.width = LW * PX + 'px'; cv.style.height = LH * PX + 'px'; // 整數倍放大，像素才會一樣大
+  ctx.imageSmoothingEnabled = false;
+  U = clamp(Math.min(W, H) / 800, 0.6, 1.4);
+  buildSky();
+}
+addEventListener('resize', resize);
+
+// ---------- 像素繪圖小工具 ----------
+// 一行一行填滿的橢圓：邊緣是乾淨的階梯狀像素
+function pxEllipse(c, cx, cy, rx, ry, col, part) {
+  c.fillStyle = col;
+  for (let y = -ry; y <= ry; y++) {
+    if (part === 'top' && y > 0) continue;
+    if (part === 'bot' && y < 0) continue;
+    const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y / (ry + 0.5)) ** 2)));
+    c.fillRect(cx - w, cy + y, w * 2 + 1, 1);
+  }
+}
+const pxCircle = (c, cx, cy, r, col) => pxEllipse(c, cx, cy, r, r, col);
+
+// ---------- 外星人像素圖（15×17） ----------
+const PAL = { k: '#173a14', g: '#8ee04f', G: '#c6f98f', d: '#55ad2f', e: '#16260f', w: '#ffffff', y: '#e9f55f', a: '#dcff86' };
+// 綠色外星貓（21×22，左右再各加 2 格放鬍鬚 → 25×22）
+const CAT = [
+  '....kkk.......kkk....',
+  '...kaaak.....kaaak...',
+  '...kawak.....kawak...',
+  '....kkk.......kkk....',
+  '.....k.........k.....',
+  '..kk..k.......k..kk..',
+  '.kgk...k.....k...kgk.',
+  '.kGgk..kkkkkkk..kggk.',
+  '.kGggkkgggggggkkgggk.',
+  '.kGGgggggggggggggggk.',
+  'kGGgggggggggggggggddk',
+  'kGggeeegggggggeeeggdk',
+  'kgggewwgggggggewwggdk',
+  'kgggeeegggggggeeeggdk',
+  'kgggeeegggggggeeeggdk',
+  'kgyyygggggkgggggyyydk',
+  'kggggggggkgkgggggggdk',
+  '.kggggggggggggggggdk.',
+  '..kddgggggggggggddk..',
+  '..kgGgkgggggggkgGgk..',
+  '..kgggkdddddddkgggk..',
+  '...kkk.kkkkkkk.kkk...',
+];
+// 加上兩側鬍鬚
+const pad = rows => rows.map((r, i) => i === 15 ? 'kk' + r + 'kk' : i === 16 ? '.k' + r + 'k.' : '..' + r + '..');
+const ALIEN = pad(CAT);
+const catVar = map => pad(CAT.map((r, i) => map[i] ?? r));
+function sprite(rows, pal = PAL) {
+  const c = document.createElement('canvas');
+  c.width = rows[0].length; c.height = rows.length;
+  const x = c.getContext('2d');
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { x.fillStyle = pal[ch]; x.fillRect(i, j, 1, 1); } }));
+  return c;
+}
+const ALIEN_F = {
+  idle: sprite(ALIEN),
+  // 觸鬚往外搖
+  wiggle: sprite(catVar({ 0: '...kkk.........kkk...', 1: '..kaaak.......kaaak..', 2: '..kawak.......kawak..', 3: '...kkk.........kkk...' })),
+  // 眨眼
+  blink: sprite(catVar({ 11: 'kGgggggggggggggggggdk', 12: 'kgggggggggggggggggddk', 13: 'kgggkkkgggggggkkkggdk', 14: 'kgggggggggggggggggddk' })),
+  // 嚇到：眼睛沒反光、嘴巴變 O
+  scared: sprite(catVar({ 0: '...kkk.........kkk...', 1: '..kaaak.......kaaak..', 2: '..kawak.......kawak..', 3: '...kkk.........kkk...',
+                          12: 'kgggeeegggggggeeeggdk', 16: 'kggggggggkkkgggggggdk', 17: '.kgggggggkekggggggdk.' })),
+};
+// 乳牛（27×18，面向右；往左跑時水平翻轉）
+const COW_PAL = { k: '#2a2140', w: '#f6f2e6', W: '#d6cfbf', b: '#2d2b3a', p: '#ff9fb2', P: '#e0708c', e: '#111111', h: '#efe2b4' };
+const COW_F = {
+  idle: sprite([
+  '...................h.....h.',
+  '...................kkkkkkk.',
+  '................kkkbbwwwwwk',
+  '................kpkbbwwewwk',
+  '..kkkkkkkkkkkkkkkkkwwwwewwk',
+  '.kkwbbbwwwwwbbbwwwwwwwwwwwk',
+  'k.kwbbbbwwwwwbbbwwwwwkkkkkk',
+  'k.kwwbbwwwwwwwbwwwwwwkPppPk',
+  'k.kwwwwwwbbwwwwwwwwwwkppppk',
+  'bbkbbwwwwwbbwwwwbbwwkkkkkk.',
+  'b.kbbWWWWWWWWWWWWbWWk......',
+  '..kWWWWWWWWWWWWWWWWWk......',
+  '..kkwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkPPkwwkkwwk......',
+  '...kwwkkwwk..kwwkkwwk......',
+  '...kbbkkbbk..kbbkkbbk......',
+  '...kkkkkkkk..kkkkkkkk......',
+], COW_PAL),
+  walk: sprite([
+  '...................h.....h.',
+  '...................kkkkkkk.',
+  '................kkkbbwwwwwk',
+  '................kpkbbwwewwk',
+  '..kkkkkkkkkkkkkkkkkwwwwewwk',
+  '.kkwbbbwwwwwbbbwwwwwwwwwwwk',
+  'k.kwbbbbwwwwwbbbwwwwwkkkkkk',
+  'k.kwwbbwwwwwwwbwwwwwwkPppPk',
+  'k.kwwwwwwbbwwwwwwwwwwkppppk',
+  'bbkbbwwwwwbbwwwwbbwwkkkkkk.',
+  'b.kbbWWWWWWWWWWWWbWWk......',
+  '..kWWWWWWWWWWWWWWWWWk......',
+  '..kkwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkPPkwwkkwwk......',
+  '...kbbkkwwk..kbbkkwwk......',
+  '...kkkkkbbk..kkkkkbbk......',
+  '.......kkkk......kkkk......',
+], COW_PAL),
+  scared: sprite([
+  '...................h.....h.',
+  '...................kkkkkkk.',
+  '................kkkbbwwwewk',
+  '................kpkbbwweewk',
+  '..kkkkkkkkkkkkkkkkkwwwweewk',
+  '.kkwbbbwwwwwbbbwwwwwwwwwwwk',
+  'k.kwbbbbwwwwwbbbwwwwwkkkkkk',
+  'k.kwwbbwwwwwwwbwwwwwwkPppPk',
+  'k.kwwwwwwbbwwwwwwwwwwkppppk',
+  'bbkbbwwwwwbbwwwwbbwwkkkkkk.',
+  'b.kbbWWWWWWWWWWWWbWWk......',
+  '..kWWWWWWWWWWWWWWWWWk......',
+  '..kkwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkppkwwkkwwk......',
+  '...kwwkkwwkPPkwwkkwwk......',
+  '...kwwkkwwk..kwwkkwwk......',
+  '...kbbkkbbk..kbbkkbbk......',
+  '...kkkkkkkk..kkkkkkkk......',
+], COW_PAL),
+};
+
+// 宇宙小雞（17×17，面向右）
+const CHICK_PAL = { k: '#2a2140', w: '#fbf7ee', W: '#dcd3c2', r: '#ff4f5e', y: '#ffc23a', o: '#ff9a2e', e: '#111111' };
+const CHICK_F = {
+  idle: sprite([
+    '........rr.......',
+    '.......rrrr......',
+    '......kkkkkk.....',
+    '.....kwwwwwwk....',
+    '.....kwwwwewk....',
+    '.....kwwwwwwkyy..',
+    '.....kwwwwwwkr...',
+    '..k..kwwwwwwk....',
+    '.kwk.kwwwwwwwk...',
+    'kwwwkkwwwwwwwwk..',
+    'kwwwwwwwWWwwwwk..',
+    'kwwwwwwWWWWwwwk..',
+    '.kwwwwwwWWwwwk...',
+    '..kkwwwwwwwkk....',
+    '....kkkkkkk......',
+    '.....o...o.......',
+    '....oo..oo.......',
+  ], CHICK_PAL),
+  walk: sprite([
+    '........rr.......',
+    '.......rrrr......',
+    '......kkkkkk.....',
+    '.....kwwwwwwk....',
+    '.....kwwwwewk....',
+    '.....kwwwwwwkyy..',
+    '.....kwwwwwwkr...',
+    '..k..kwwwwwwk....',
+    '.kwk.kwwwwwwwk...',
+    'kwwwkkwwwwwwwwk..',
+    'kwwwwwwwWWwwwwk..',
+    'kwwwwwwWWWWwwwk..',
+    '.kwwwwwwWWwwwk...',
+    '..kkwwwwwwwkk....',
+    '....kkkkkkk......',
+    '......o.o........',
+    '....oo...oo......',
+  ], CHICK_PAL),
+  scared: sprite([
+    '........rr.......',
+    '.......rrrr......',
+    '......kkkkkk.....',
+    '.....kwwwwwwk....',
+    '.....kwwwweek....',
+    '.....kwwwwwwky.y.',
+    '.....kwwwwwwkr...',
+    '..k..kwwwwwwk....',
+    '.kwk.kwwwwwwwk...',
+    'kwwwkkwwwwwwwwk..',
+    'kwwwwwwwWWwwwwk..',
+    'kwwwwwwWWWWwwwk..',
+    '.kwwwwwwWWwwwk...',
+    '..kkwwwwwwwkk....',
+    '....kkkkkkk......',
+    '.....o...o.......',
+    '....oo..oo.......',
+  ], CHICK_PAL),
+};
+
+// 金色稀有版：把原本的顏色逐格換成金色系
+function recolor(src, map) {
+  const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+  const x = c.getContext('2d'); x.drawImage(src, 0, 0);
+  const im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const pairs = Object.entries(map).map(([a, b]) => [rgb(a), rgb(b)]);
+  for (let i = 0; i < d.length; i += 4) {
+    for (const [a, b] of pairs) if (d[i] === a[0] && d[i + 1] === a[1] && d[i + 2] === a[2]) { d[i] = b[0]; d[i + 1] = b[1]; d[i + 2] = b[2]; break; }
+  }
+  x.putImageData(im, 0, 0); return c;
+}
+const GOLD_LINE = '#5a3a0a';
+const GOLD_MAP = {
+  cat: { [PAL.k]: GOLD_LINE, [PAL.g]: '#ffd84a', [PAL.G]: '#fff3a8', [PAL.d]: '#d9a21b', [PAL.y]: '#fff7c2', [PAL.a]: '#ffffff' },
+  cow: { [COW_PAL.k]: GOLD_LINE, [COW_PAL.w]: '#ffe680', [COW_PAL.W]: '#e8c14a', [COW_PAL.b]: '#c98a1e', [COW_PAL.h]: '#fff3c4' },
+  chicken: { [CHICK_PAL.k]: GOLD_LINE, [CHICK_PAL.w]: '#ffe680', [CHICK_PAL.W]: '#e8c14a', [CHICK_PAL.r]: '#ff7a3a', [CHICK_PAL.y]: '#fff3a8', [CHICK_PAL.o]: '#ffb02e' },
+};
+const FR = { cat: ALIEN_F, cow: COW_F, chicken: CHICK_F };
+for (const base of ['cat', 'cow', 'chicken']) FR['gold' + base] = Object.fromEntries(Object.entries(FR[base]).map(([k, f]) => [k, recolor(f, GOLD_MAP[base])]));
+
+// 生物種類：出現權重、鎖定時的台詞
+const SPECIES = {
+  cat: { name: 'Alien Cat', lock: 'LOCKED!', w: 55 },
+  cow: { name: 'Space Cow', lock: 'MOO!', w: 30 },
+  chicken: { name: 'Cosmic Chick', lock: 'BAWK!', w: 15 },
+};
+const GOLD_CHANCE = new URLSearchParams(location.search).has('gold') ? 1 : 0.04; // 網址加 ?gold 可測試金色
+const CODEX = ['cat', 'cow', 'chicken', 'goldcat', 'goldcow', 'goldchicken'];
+const baseOf = k => k.replace('gold', '');
+const kindName = k => (k.startsWith('gold') ? 'Golden ' : '') + SPECIES[baseOf(k)].name;
+function rollKind() {
+  let r = Math.random() * 100, base = 'cat';
+  for (const [k, v] of Object.entries(SPECIES)) if ((r -= v.w) < 0) { base = k; break; }
+  return (Math.random() < GOLD_CHANCE ? 'gold' : '') + base;
+}
+
+// HUD 和網頁圖示用同一隻外星人
+(() => {
+  const big = document.createElement('canvas'); big.width = 64; big.height = 64;
+  const b = big.getContext('2d'); b.imageSmoothingEnabled = false; b.drawImage(ALIEN_F.idle, 7, 10, 50, 44);
+  $('favicon').href = big.toDataURL(); $('hudIcon').src = big.toDataURL();
+})();
+
+// =====================================================================
+//  背景：分段夜空＋抖動過渡、行星、星星、紫色像素雲
+// =====================================================================
+let sky = null, cloudBank = null, stars = [], puffs = [];
+function buildSky() {
+  // 1) 分段夜空（像素遊戲常見的色帶＋棋盤抖動）
+  sky = document.createElement('canvas'); sky.width = LW; sky.height = LH;
+  const g = sky.getContext('2d');
+  const bands = ['#0c0e30', '#0f123c', '#121547', '#161a55', '#1b2063'];
+  const bh = LH / bands.length;
+  bands.forEach((col, i) => { g.fillStyle = col; g.fillRect(0, Math.floor(i * bh), LW, Math.ceil(bh) + 1); });
+  bands.forEach((col, i) => {
+    if (!i) return;
+    const y0 = Math.floor(i * bh) - 3; g.fillStyle = col;
+    for (let r = 0; r < 3; r++) for (let x = 0; x < LW; x++) if ((x + (y0 + r) * 2) % 4 <= r) g.fillRect(x, y0 + r, 1, 1);
+  });
+  // 2) 行星（右上，帶光環）
+  const px = Math.round(LW * 0.85), py = Math.round(LH * 0.17), pr = 11;
+  const ring = front => { for (let x = -20; x <= 20; x++) { const y = Math.round(Math.sqrt(Math.max(0, 1 - (x / 20.5) ** 2)) * 5); const yy = front ? y : -y; if (front && y < 1) continue; g.fillStyle = '#ffd84a'; g.fillRect(px + x, py + 1 + yy, 1, 1); g.fillStyle = '#c98a1e'; g.fillRect(px + x, py + 2 + yy, 1, 1); } };
+  ring(false);
+  pxCircle(g, px, py, pr, '#e0576b'); pxCircle(g, px - 2, py - 2, pr - 2, '#ff8a6b'); pxCircle(g, px - 4, py - 4, 3, '#ffc09f');
+  g.fillStyle = '#c4405a'; g.fillRect(px - 6, py + 3, 9, 1); g.fillRect(px - 3, py + 6, 7, 1);
+  ring(true);
+  pxCircle(g, Math.round(LW * 0.12), Math.round(LH * 0.32), 3, '#8f74e6'); pxCircle(g, Math.round(LW * 0.12) - 1, Math.round(LH * 0.32) - 1, 1, '#c8b8ff');
+
+  // 3) 星星（有些會閃成十字）
+  stars = [];
+  const n = Math.round(LW * LH / 420);
+  for (let i = 0; i < n; i++) stars.push({ x: Math.random() * LW, y: Math.random() * LH, layer: Math.random() < 0.7 ? 0 : 1, sparkle: Math.random() < 0.08, tw: Math.random() * 6, c: Math.random() < 0.6 ? '#fff3a8' : '#ffffff' });
+
+  // 4) 底部紫色雲海（畫兩倍寬，捲動接縫才不會斷）
+  cloudBank = document.createElement('canvas'); cloudBank.width = LW * 2; cloudBank.height = 60;
+  const cb = cloudBank.getContext('2d');
+  const blobs = [];
+  for (let x = -10; x < LW + 20; x += 14 + Math.random() * 12) blobs.push({ x, y: 40 + Math.random() * 10, r: 10 + Math.random() * 12 });
+  const all = [...blobs, ...blobs.map(b => ({ ...b, x: b.x + LW }))];
+  all.forEach(b => pxCircle(cb, Math.round(b.x + 2), Math.round(b.y + 2), Math.round(b.r), '#3d2f8a'));
+  all.forEach(b => pxCircle(cb, Math.round(b.x), Math.round(b.y), Math.round(b.r), '#6b54c9'));
+  all.forEach(b => pxCircle(cb, Math.round(b.x - 3), Math.round(b.y - 3), Math.round(b.r * 0.55), '#8f74e6'));
+  cb.fillStyle = '#3d2f8a'; cb.fillRect(0, 52, LW * 2, 8);
+
+  // 5) 漂浮小雲（粉紫＋蜜桃色）
+  puffs = [0, 1, 2].map(i => ({ x: Math.random() * LW, y: LH * (0.22 + i * 0.2), s: 0.6 + Math.random() * 0.5, v: 2 + Math.random() * 3 }));
+}
+
+function drawPuff(c, x, y, s) {
+  const p = [[0, 0, 7], [8, -3, 9], [17, 0, 7], [24, 2, 5]];
+  p.forEach(([dx, dy, r]) => pxCircle(c, Math.round(x + dx * s + 1), Math.round(y + dy * s + 2), Math.round(r * s), '#5a45b0'));
+  p.forEach(([dx, dy, r]) => pxCircle(c, Math.round(x + dx * s), Math.round(y + dy * s), Math.round(r * s), '#b9a6ff'));
+  p.forEach(([dx, dy, r]) => pxCircle(c, Math.round(x + dx * s - 2), Math.round(y + dy * s - 2), Math.round(r * s * 0.5), '#ffd6e4'));
+}
+
+function drawBackground(t, dt) {
+  ctx.drawImage(sky, 0, 0);
+  const vx = S.ufo.vx / PX, vy = S.ufo.vy / PX;
+  for (const s of stars) {
+    const k = s.layer ? 0.06 : 0.02;           // 視差：近的星星動比較多
+    s.x -= vx * k * dt; s.y -= vy * k * dt;
+    if (s.x < 0) s.x += LW; if (s.x > LW) s.x -= LW; if (s.y < 0) s.y += LH; if (s.y > LH) s.y -= LH;
+    const on = Math.sin(t * 2 + s.tw) > -0.3;
+    ctx.fillStyle = s.c;
+    const X = Math.round(s.x), Y = Math.round(s.y);
+    if (s.sparkle && Math.sin(t * 3 + s.tw) > 0.4) { ctx.fillRect(X - 1, Y, 3, 1); ctx.fillRect(X, Y - 1, 1, 3); }
+    else if (on || s.layer) ctx.fillRect(X, Y, 1, 1);
+  }
+  for (const p of puffs) {
+    p.x -= p.v * dt; if (p.x < -40) p.x = LW + 10;
+    drawPuff(ctx, Math.round(p.x), Math.round(p.y), p.s);
+  }
+  const off = Math.floor((t * 4) % LW);
+  ctx.drawImage(cloudBank, -off, LH - 42);
+}
+
+// =====================================================================
+//  飛碟（仿參考圖：藍艙罩、銀碟身、窗燈）
+// =====================================================================
+// 飛碟果凍變形：先畫到小畫布，再用最近鄰縮放（像素保持硬邊），以底盤為支點
+const ufoBuf = document.createElement('canvas'); ufoBuf.width = 72; ufoBuf.height = 44;
+const ubc = ufoBuf.getContext('2d');
+function drawUFO(x, y, t, tilt, glow, sx = 1, sy = 1) {
+  const X = q(x), Y = q(y) + Math.round(Math.sin(t * 2.4));
+  if (Math.abs(sx - 1) < 0.03 && Math.abs(sy - 1) < 0.03) { paintUFO(ctx, X, Y, t, tilt, glow); return; }
+  ubc.clearRect(0, 0, 72, 44); paintUFO(ubc, 36, 22, t, tilt, glow);
+  ctx.drawImage(ufoBuf, X - Math.round(36 * sx), Y + 12 - Math.round(34 * sy), Math.round(72 * sx), Math.round(44 * sy));
+}
+function paintUFO(c, X, Y, t, tilt, glow) {
+  const K = '#1a1433', squash = 0;
+  const L = Math.round(clamp(tilt, -1, 1) * 3);            // 飛行傾斜：艙罩往前偏
+  const sq = Math.round(squash * 3);                          // 吸進外星人時被壓扁一下
+  // 外框先畫一層，填色再蓋上去，輪廓會連成一圈
+  pxEllipse(c, X, Y + 9 - sq, 10, 3, K);
+  pxEllipse(c, X, Y + 4 - sq, 23 + sq, 6, K);
+  pxEllipse(c, X, Y - sq, 25 + sq, 5, K);
+  pxEllipse(c, X + L, Y - 3, 13 - sq, 11 - sq, K, 'top');
+  // 底盤＋光束發射口
+  pxEllipse(c, X, Y + 9 - sq, 9, 2, '#3b3f55');
+  pxEllipse(c, X, Y + 10 - sq, 5, 1, glow > 0.2 ? (Math.floor(t * 8) % 2 ? '#5ef0ff' : '#b8fbff') : '#2a6d7a');
+  // 碟身（下半較暗）
+  pxEllipse(c, X, Y + 4 - sq, 22 + sq, 5, '#a9b2c4');
+  pxEllipse(c, X, Y + 6 - sq, 19 + sq, 3, '#7d8599', 'bot');
+  // 窗燈輪流亮
+  const lights = ['#ffd84a', '#ff6fa5', '#5ef0ff'];
+  for (let i = -2; i <= 2; i++) {
+    const on = (Math.floor(t * 5) + i + 9) % 3 === 0;
+    c.fillStyle = on ? lights[(i + 6) % 3] : '#3b3f55';
+    c.fillRect(X + i * 8 - 1, Y + 4 - sq, 3, 2);
+  }
+  // 上緣亮邊
+  pxEllipse(c, X, Y - sq, 24 + sq, 4, '#e8edf5');
+  pxEllipse(c, X, Y + 1 - sq, 22 + sq, 3, '#c3cad8', 'bot');
+  c.fillStyle = '#ffffff'; c.fillRect(X - 17, Y - 2 - sq, 9, 1); c.fillRect(X + 10, Y - 3 - sq, 4, 1);
+  // 艙罩
+  pxEllipse(c, X + L, Y - 3, 12 - sq, 10 - sq, '#2b7fd6', 'top');
+  pxEllipse(c, X + L - 2, Y - 4, 8 - sq, 7 - sq, '#4fa3ef', 'top');
+  // 駕駛員（就是你）
+  // 駕駛員：綠色外星人（倒蛋頭＋黑色大眼）
+  c.fillStyle = '#7cbf6b';
+  c.fillRect(X + L - 1, Y - 10, 3, 1); c.fillRect(X + L - 2, Y - 9, 5, 3); c.fillRect(X + L - 1, Y - 6, 3, 1); c.fillRect(X + L, Y - 5, 1, 1);
+  c.fillStyle = '#10200d'; c.fillRect(X + L - 2, Y - 8, 2, 1); c.fillRect(X + L + 1, Y - 8, 2, 1);
+  // 艙罩反光
+  c.fillStyle = '#d6efff';
+  c.fillRect(X + L - 9, Y - 7 + sq, 1, 3); c.fillRect(X + L - 8, Y - 9 + sq, 1, 2); c.fillRect(X + L - 6, Y - 11 + sq, 2, 1);
+  c.fillRect(X + L + 7, Y - 9 + sq, 2, 1); c.fillRect(X + L + 9, Y - 8 + sq, 1, 2);
+}
+
+// 外星人：s = 縮放、tilt = 掙扎晃動、sy = 垂直拉伸（被吸進去時）
+function drawAlien(x, y, t, s = 1, tilt = 0, scared = 0, sy = 1, seed = 0, sx = 1, kind = 'cat', flip = false, walking = false) {
+  let f;
+  const F = FR[kind] || FR.cat;
+  if (scared > 0.3) f = F.scared;
+  else if (baseOf(kind) === 'cat') {
+    const blink = ((t * 0.6 + seed) % 4) < 0.12;
+    f = blink ? F.blink : (Math.floor(t * 3) % 2 ? F.wiggle : F.idle);
+  } else f = walking && Math.floor(t * (baseOf(kind) === 'chicken' ? 9 : 6)) % 2 ? F.walk : F.idle;
+  const w = Math.round(f.width * s * sx), h = Math.round(f.height * s * sy);
+  if (w < 1 || h < 1) return;
+  ctx.save();
+  ctx.translate(q(x), q(y));
+  if (tilt) ctx.rotate(tilt);
+  if (flip) ctx.scale(-1, 1);
+  ctx.drawImage(f, -Math.round(w / 2), -Math.round(h / 2), w, h);
+  ctx.restore();
+}
+
+// 牽引光束：青色水流＋往上流的條紋＋彩虹邊（仿參考圖 1）
+const RAINBOW = ['#ff6fa5', '#ffd84a', '#6ee7a0', '#5ad1e6', '#8f74e6', '#c86bff'];
+function drawBeam(ux, uy, gx, gy, t, breath, alpha = 1) {
+  const X0 = q(ux), Y0 = q(uy) + 11, X1 = q(gx), Y1 = q(gy) + 9, n = Y1 - Y0;
+  if (n <= 2) return;
+  const w0 = 6, w1 = 15 + Math.round(breath * 4);
+  const flow = Math.floor(t * 26);
+  for (let i = 0; i <= n; i++) {
+    const k = i / n, cx = Math.round(lerp(X0, X1, k)), hw = Math.round(lerp(w0, w1, k)), y = Y0 + i;
+    ctx.globalAlpha = 0.82 * alpha;
+    ctx.fillStyle = '#4fd0e0'; ctx.fillRect(cx - hw, y, hw * 2 + 1, 1);
+    for (let x = -hw + 1; x < hw; x++) {
+      const col = (x + 400) % 5;
+      if (col === 1 && (y + flow + x * 3) % 7 < 3) { ctx.fillStyle = '#b5f4fa'; ctx.fillRect(cx + x, y, 1, 1); }
+      else if (col === 3 && (y + flow + x * 5) % 9 < 2) { ctx.fillStyle = '#26a9c4'; ctx.fillRect(cx + x, y, 1, 1); }
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = RAINBOW[(i + flow) % 6]; ctx.fillRect(cx - hw - 1, y, 1, 1);
+    ctx.fillStyle = RAINBOW[(i + flow + 3) % 6]; ctx.fillRect(cx + hw + 1, y, 1, 1);
+  }
+  // 底部水滴邊
+  ctx.fillStyle = '#4fd0e0';
+  for (let x = -w1; x <= w1; x += 2) ctx.fillRect(X1 + x, Y1 + 1, 1, ((x * 7 + 100 + Math.floor(t * 5)) % 4));
+  ctx.globalAlpha = 1;
+}
+
+// 像素粒子：光束裡往上飄的光點＋抓到時炸開的星星
+function drawParticles(dt) {
+  for (const p of S.particles) {
+    p.y += p.vy * dt; p.x = lerp(p.x, p.tx, dt * 0.8); p.life -= dt * 0.8;
+    if (p.life <= 0) continue;
+    ctx.fillStyle = p.life > 0.5 ? '#ffffff' : '#b5f4fa';
+    ctx.fillRect(q(p.x), q(p.y), 1, 1);
+  }
+  for (const p of S.sparks) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.93; p.vy = p.vy * 0.93 + 30 * dt; p.life -= dt * 1.1;
+    if (p.life <= 0) continue;
+    const X = q(p.x), Y = q(p.y);
+    ctx.fillStyle = p.c;
+    if (p.star && p.life > 0.4) { ctx.fillRect(X - 1, Y, 3, 1); ctx.fillRect(X, Y - 1, 1, 3); }
+    else ctx.fillRect(X, Y, p.life > 0.6 ? 2 : 1, p.life > 0.6 ? 2 : 1);
+  }
+  S.particles = S.particles.filter(p => p.life > 0);
+  S.sparks = S.sparks.filter(p => p.life > 0);
+}
+function burst(x, y, n = 46) {
+  const cols = ['#ffd84a', '#6ee7a0', '#5ad1e6', '#ff7aa8', '#ffffff'];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = (120 + Math.random() * 320) * U;
+    S.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 60, life: 1, c: cols[i % cols.length], star: i % 3 === 0 });
+  }
+}
+
+// 鎖定時的像素光圈
+function drawRing(x, y, k) {
+  const r = Math.round(6 + k * 40), X = q(x), Y = q(y);
+  ctx.globalAlpha = 1 - k;
+  ctx.fillStyle = '#ffd84a';
+  for (let a = 0; a < 64; a++) { const t = a / 64 * Math.PI * 2; ctx.fillRect(X + Math.round(Math.cos(t) * r), Y + Math.round(Math.sin(t) * r * 0.8), 1, 1); }
+  ctx.globalAlpha = 1;
+}
+
+// 往外星人方向的像素虛線（一格一格往前跑）
+function drawGuide(t) {
+  const a = S.alien, u = S.ufo;
+  const dx = a.x - u.x, dy = a.y - u.y, d = Math.hypot(dx, dy);
+  if (d < 160 * U) return;
+  const ux = dx / d, uy = dy / d, X = q(u.x), Y = q(u.y) + 2;
+  const step = Math.floor(t * 8) % 4;
+  for (let i = 0; i < 4; i++) {
+    const r = 32 + i * 6;
+    ctx.fillStyle = i === step ? '#ffffff' : '#6ee7a0';
+    ctx.fillRect(X + Math.round(ux * r) - 1, Y + Math.round(uy * r) - 1, 2, 2);
+  }
+}
+
+// 抓捕時四周變暗，把視線集中到中間
+function drawFocus(k) {
+  if (k <= 0.01) return;
+  const g = ctx.createRadialGradient(LW / 2, LH * 0.4, LH * 0.14, LW / 2, LH * 0.4, Math.max(LW, LH) * 0.62);
+  g.addColorStop(0, 'rgba(6,5,24,0)'); g.addColorStop(1, `rgba(6,5,24,${0.9 * k})`);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, LW, LH);
+}
+
+// ---------- 卡片上的小頭像（像素小螢幕裡：粉紅虛線＝目標，實心＝你） ----------
+const av = $('avatar'), actx = av.getContext('2d', { willReadFrequently: true });
+// 經典灰綠外星人（參考圖）：上寬下尖的大頭、尖頭杏仁大眼（外側上翹＋淺色眼圈）、小嘴、沒有鼻子
+const ALIEN_SKIN = '#7cbf6b', ALIEN_LINE = '#1b3317', ALIEN_EYE = '#141a12', ALIEN_RIM = '#b9dca9';
+const headPath = (c, R) => {
+  c.beginPath();
+  c.moveTo(0, -R);
+  c.bezierCurveTo(R * 1.08, -R, R * 1.0, R * 0.05, R * 0.3, R * 0.8);
+  c.quadraticCurveTo(0, R * 1.05, -R * 0.3, R * 0.8);
+  c.bezierCurveTo(-R * 1.0, R * 0.05, -R * 1.08, -R, 0, -R);
+  c.closePath();
+};
+// 尖頭杏仁眼：內眼角低、外眼角高
+function almond(c, cx, cy, len, thick, d) {
+  const ix = cx - d * len * 0.5, iy = cy + len * 0.16;   // 內眼角
+  const ox = cx + d * len * 0.5, oy = cy - len * 0.2;    // 外眼角
+  c.beginPath();
+  c.moveTo(ix, iy);
+  c.quadraticCurveTo(cx - d * len * 0.05, cy - thick * 1.25, ox, oy);
+  c.quadraticCurveTo(cx + d * len * 0.12, cy + thick * 1.1, ix, iy);
+  c.closePath();
+}
+function drawHead(c, cx, cy, R, p, ghost) {
+  const yaw = (p.yaw || 0) / DEG, pitch = (p.pitch || 0) / DEG, roll = (p.roll || 0) / DEG;
+  const lw = Math.max(1, Math.round(R * 0.08));
+  c.save(); c.translate(cx, cy + R * 0.95); c.rotate(roll * 0.9); c.translate(0, -R * 0.95);
+  // 轉頭時五官往那一側移，遠的那隻眼睛變短
+  const fx = Math.sin(yaw) * R * 0.5, fy = -Math.sin(pitch) * R * 0.42;
+  const ex = Math.cos(yaw) * R * 0.31, ey = fy + R * 0.06;
+  if (ghost) {
+    c.setLineDash([lw * 2, lw * 2]); c.strokeStyle = '#ff7aa8'; c.lineWidth = lw;
+    headPath(c, R); c.stroke();
+    for (const d of [-1, 1]) { const far = 1 - Math.max(0, -d * Math.sin(yaw)) * 0.65; almond(c, fx + d * ex, ey, R * 0.54 * far, R * 0.27, d); c.stroke(); }
+    c.setLineDash([]);
+  } else {
+    headPath(c, R);
+    c.fillStyle = ALIEN_SKIN; c.fill();
+    c.strokeStyle = ALIEN_LINE; c.lineWidth = lw; c.stroke();
+    // 大眼：先描一圈淺色眼圈再填黑
+    for (const d of [-1, 1]) {
+      const far = 1 - Math.max(0, -d * Math.sin(yaw)) * 0.65;
+      almond(c, fx + d * ex, ey, R * 0.54 * far, R * 0.27 * Math.max(0.5, Math.cos(pitch)), d);
+      c.strokeStyle = ALIEN_RIM; c.lineWidth = lw * 1.2; c.stroke();
+      c.fillStyle = ALIEN_EYE; c.fill();
+    }
+    // 小嘴
+    c.fillStyle = ALIEN_LINE;
+    c.beginPath(); c.ellipse(fx * 1.1, fy + R * 0.48, R * 0.08, Math.max(1, R * 0.035), 0, 0, Math.PI * 2); c.fill();
+  }
+  c.restore();
+}
+function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.height, ox = 0) {
+  const cx = ox + w / 2, cy = h * 0.46, R = h * 0.26;
+  if (c === actx) {
+    c.fillStyle = '#121547'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#fff3a8'; [[10, 12], [100, 20], [18, 70], [108, 80], [92, 8]].forEach(([x, y]) => c.fillRect(x, y, 1, 1));
+  }
+  // 身體：細脖子往下變寬成斜肩，手臂垂在兩側（和參考圖一樣是一整片輪廓）
+  // 繞肩示範：up = 肩膀抬高多少、back = 往後收（肩寬變窄）
+  const up = (live.shoulderUp || 0) * R, bk = (live.shoulderBack || 0) * R;
+  const body = () => {
+    c.beginPath();
+    c.moveTo(cx - R * 0.2, cy + R * 0.6);
+    c.quadraticCurveTo(cx - R * 0.24, cy + R * 1.25 - up, cx - R * 0.75 + bk * 0.5, cy + R * 1.45 - up);
+    c.quadraticCurveTo(cx - R * 1.25 + bk, cy + R * 1.62 - up, cx - R * 1.3 + bk * 0.6, h + 2);
+    c.lineTo(cx + R * 1.3 - bk * 0.6, h + 2);
+    c.quadraticCurveTo(cx + R * 1.25 - bk, cy + R * 1.62 - up, cx + R * 0.75 - bk * 0.5, cy + R * 1.45 - up);
+    c.quadraticCurveTo(cx + R * 0.24, cy + R * 1.25 - up, cx + R * 0.2, cy + R * 0.6);
+    c.closePath();
+  };
+  const blw = Math.max(1, Math.round(R * 0.08));
+  body(); c.fillStyle = ALIEN_SKIN; c.fill(); c.strokeStyle = ALIEN_LINE; c.lineWidth = blw; c.stroke();
+  // 手臂和身體之間的縫
+  c.beginPath();
+  for (const d of [-1, 1]) { c.moveTo(cx + d * (R * 0.92 - bk * 0.6), cy + R * 1.75 - up); c.quadraticCurveTo(cx + d * (R * 0.98 - bk * 0.6), h - R * 0.1, cx + d * (R * 0.95 - bk * 0.6), h + 2); }
+  c.stroke();
+  drawHead(c, cx, cy, R, live, false);
+  // 外圈進度環
+  const rr = R * 1.5, lw = Math.max(2, Math.round(R * 0.14));
+  c.lineWidth = lw; c.lineCap = 'butt';
+  c.strokeStyle = '#2a2f6a'; c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.stroke();
+  if (progress > 0) { c.strokeStyle = hit ? '#6ee7a0' : '#5ad1e6'; c.beginPath(); c.arc(cx, cy, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress); c.stroke(); }
+  if (target) {
+    drawHead(c, cx, cy, R, target, true);
+    // 粉紅箭頭：要往哪邊動（到位後消失）
+    const dx = (target.yaw || 0) / 35 + (target.roll || 0) / 30, dy = -(target.pitch || 0) / 25;
+    if (Math.hypot(dx, dy) > 0.1 && !hit && Math.floor(performance.now() / 300) % 2) {
+      const ang = Math.atan2(dy, dx);
+      c.save(); c.translate(cx + Math.cos(ang) * rr, cy + Math.sin(ang) * rr); c.rotate(ang);
+      c.fillStyle = '#ff7aa8'; const z = R * 0.3;
+      c.beginPath(); c.moveTo(z, 0); c.lineTo(-z * 0.6, -z * 0.8); c.lineTo(-z * 0.6, z * 0.8); c.closePath(); c.fill();
+      c.restore();
+    }
+  }
+  if (c === actx) crisp(c);
+}
+// 把反鋸齒的半透明邊緣去掉，讓小頭像也是硬邊像素
+function crisp(c) {
+  const im = c.getImageData(0, 0, c.canvas.width, c.canvas.height), d = im.data;
+  for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 110 ? 255 : 0;
+  c.putImageData(im, 0, 0);
+}
+
+// =====================================================================
+//  UI 工具
+// =====================================================================
+let toastTimer;
+function toast(msg, ms = 2200) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+function pop(text, x, y, cls) {
+  const el = document.createElement('div');
+  el.className = 'pop' + (cls ? ' ' + cls : ''); el.textContent = text;
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1300);
+}
+function center(title, sub) {
+  if (!title) { $('center').classList.add('hidden'); return; }
+  $('center').classList.remove('hidden'); $('centerTitle').textContent = title; $('centerSub').innerHTML = sub || '';
+}
+function card(o) {
+  if (!o) { $('card').classList.add('hidden'); return; }
+  $('card').classList.remove('hidden');
+  $('cardStep').textContent = o.step || ''; $('cardTitle').textContent = o.title || '';
+  $('cardTip').textContent = o.tip || '';
+  $('cardMuscle').innerHTML = o.muscle ? `Stretches <b>${o.muscle}</b>` : '';
+  $('meter').classList.toggle('hidden', !o.meter);
+  $('cardBreath').textContent = '';
+  countdown(null); $('cardCount').classList.remove('dim');
+}
+function setMeter(r, need) {
+  const max = 1.2; // 量表顯示 0～1.2 倍目標，黑線是「到位」的位置
+  $('meterFill').style.width = (clamp(r, 0, max) / max * 100) + '%';
+  $('meterMark').style.left = (need / max * 100) + '%';
+  $('meter').classList.toggle('hit', r >= need);
+}
+const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+// ---------- 音效（Web Audio 方波，有 8-bit 味道） ----------
+let audio, muted = false;
+// 辦公室友善：預設靜音，使用者打開過才記住
+try { const m = localStorage.getItem('catchAliens.muted'); muted = m === null ? true : m === '1'; } catch { muted = true; }
+function chime(freqs = [660, 880, 1320], dur = 0.1, type = 'square', vol = 0.05) {
+  if (muted) return;
+  try {
+    audio = audio || new AudioContext();
+    freqs.forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + i * dur;
+      o.type = type; o.frequency.value = f;
+      g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur * 2);
+      o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + dur * 2.5);
+    });
+  } catch {}
+}
+// 光束「吸」的上滑音
+function swoop(up = true) {
+  if (muted) return;
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime;
+    o.type = 'square'; o.frequency.setValueAtTime(up ? 220 : 880, t0); o.frequency.exponentialRampToValueAtTime(up ? 1200 : 200, t0 + 0.35);
+    g.gain.setValueAtTime(0.04, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+    o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + 0.45);
+  } catch {}
+}
+// 乳牛「哞～」：低音往下滑
+function moo() {
+  if (muted) return;
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + 0.15;
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(190, t0); o.frequency.linearRampToValueAtTime(230, t0 + 0.15); o.frequency.exponentialRampToValueAtTime(130, t0 + 0.6);
+    g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(0.05, t0 + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.7);
+    o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + 0.75);
+  } catch {}
+}
+// 小雞「咕咕」：短促上滑三聲
+function cluck() {
+  if (muted) return;
+  [0, 0.13, 0.26].forEach((d, i) => {
+    try {
+      audio = audio || new AudioContext();
+      const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + 0.12 + d;
+      o.type = 'square'; o.frequency.setValueAtTime(600 + i * 80, t0); o.frequency.exponentialRampToValueAtTime(1100 + i * 120, t0 + 0.07);
+      g.gain.setValueAtTime(0.035, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.09);
+      o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + 0.1);
+    } catch {}
+  });
+}
+// 倒數：每秒一聲，最後 3 秒音調升高
+let lastCount = null;
+function countdown(sec, audible = true) {
+  const el = $('cardCount');
+  if (sec == null) { el.textContent = ''; lastCount = null; return; }
+  if (sec !== lastCount) {
+    el.textContent = sec;
+    el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick');
+    if (audible && typeof lastCount === 'number' && sec < lastCount) chime([sec <= 3 ? 1320 : 880], 0.04, 'square', 0.035);
+    lastCount = sec;
+  }
+}
+
+// =====================================================================
+//  遊戲流程
+//  fly → lock（滑到正中間）→ beam（維持伸展）→ ret（回正）→ suck（吸進飛碟）→ fly
+// =====================================================================
+function go(phase) {
+  S.phase = phase; S.phaseT = 0;
+  center(null);
+  if (!['lock', 'beam', 'ret', 'suck'].includes(phase)) card(null);
+  if (phase === 'setup') center('CENTER YOUR FACE', 'Sit up straight.<br>Fit your face in the oval (bottom right).');
+  if (phase === 'calib') center('LOOK AT THE SCREEN', 'Relax and hold still.');
+  if (phase === 'warmTuck') card({ step: 'WARM-UP 1/2', title: 'Chin tuck', tip: 'Slide your head straight back. Make a double chin.', muscle: 'Deep neck muscles' });
+  if (phase === 'warmShoulder') card({ step: 'WARM-UP 2/2', title: 'Shoulder rolls', tip: 'Roll your shoulders up, back and down. 5 times.', muscle: 'Shoulders' });
+  if (phase === 'fly') { $('hud').classList.remove('hidden'); if (!S.alien) spawnAlien(); }
+  if (phase === 'lock') {
+    const u = S.ufo, al = S.alien;
+    S.lockFrom = { ux: u.x, uy: u.y, ax: al.x, ay: al.y };
+    S.flash = 1; swoop(true);
+    const st = stage(), gold = al.kind.startsWith('gold'), base = baseOf(al.kind);
+    pop(gold ? 'GOLDEN!!' : SPECIES[base].lock, st.x, (st.uy + st.gy) / 2, 'lock');
+    if (gold) chime([1046, 1318, 1568, 2093], 0.06);
+    if (base === 'cow') moo(); else if (base === 'chicken') cluck();
+    setPose(nextPose());
+  }
+  if (phase === 'ret') card({ step: 'ALMOST THERE', title: 'Back to center', tip: 'Face forward and relax.' });
+  if (phase === 'suck') swoop(true);
+  if (phase === 'cool') { card({ step: 'COOL DOWN', title: 'Breathe', tip: 'Follow the glow. Let your shoulders drop.' }); S.alien = null; }
+  if (phase === 'result') showResult();
+}
+
+function setPose(key) {
+  S.pose = key; S.hold = 0; S.missT = 0; S.assist = 1; S.beamT = 0;
+  const P = POSES[key];
+  card({ step: `${S.alien ? kindName(S.alien.kind).toUpperCase() : 'ALIEN'} #${S.caught + 1}`, title: P.title, tip: P.tip, muscle: P.muscle, meter: true });
+}
+
+// 抓捕舞台：飛碟在上、外星人在下，都在畫面正中間（避開下方卡片）
+function stage() {
+  const cardTop = $('card').classList.contains('hidden') ? H - 190 : $('card').getBoundingClientRect().top;
+  const gy = Math.min(H * 0.6, cardTop - 50);
+  const uy = clamp(gy - 260 * U, 60, H * 0.3);
+  return { x: W / 2, uy, gy };
+}
+
+function alienBounds() {
+  return { x0: 80 * U, x1: W - 80 * U, y0: Math.max(140 * U, H * 0.2), y1: H - 130 * U };
+}
+function spawnAlien() {
+  const u = S.ufo, b = alienBounds();
+  let x, y, tries = 0;
+  do {
+    x = b.x0 + Math.random() * (b.x1 - b.x0);
+    y = b.y0 + Math.random() * Math.max(0, b.y1 - b.y0);
+    tries++;
+  } while (Math.hypot(x - u.x, y - u.y) < Math.min(W, H) * 0.35 && tries < 40);
+  S.alien = { x, y, lift: 0, vx: 0, vy: 0, dir: Math.random() * Math.PI * 2, turnT: 1, seed: Math.random() * 4, kind: rollKind(), face: false };
+  S.flash = 0;
+}
+
+// 外星人會跑：隨機換方向、碰邊反彈、飛碟靠近時閃躲（但比飛碟慢）
+function moveAlien(dt) { if (S.alien) moveCreature(S.alien, dt); }
+
+// 搖桿式操控：轉越多飛越快，回正就懸停（mul = 速度倍率）
+function flyUFO(a, dt, mul) {
+  const ax = v => { const s = Math.sign(v), m = Math.abs(v); return m < CFG.dead ? 0 : s * Math.min(1, (m - CFG.dead) / (CFG.full - CFG.dead)); };
+  const sp = CFG.speed * U * mul;
+  const tx = ax(a.yaw) * sp, ty = -ax(a.pitch * 1.3) * sp; // 抬頭幅度刻意放大，不用仰太多
+  const u = S.ufo;
+  u.vx = lerp(u.vx, tx, 1 - Math.exp(-dt * 4)); u.vy = lerp(u.vy, ty, 1 - Math.exp(-dt * 4));
+  u.x = clamp(u.x + u.vx * dt, 80 * U, W - 80 * U); u.y = clamp(u.y + u.vy * dt, 60 * U, H - 80 * U);
+  u.tilt = lerp(u.tilt, clamp(u.vx / sp, -1, 1), 0.1);
+}
+
+// =====================================================================
+//  ALIEN RUSH 衝刺關：10 秒內同時有 10 隻，飛碟碰到就瞬間吸走
+// =====================================================================
+const RUSH_SEC = 10, RUSH_N = 10;
+function startRush(final) {
+  S.rushFinal = final; if (final) S.finalDone = true;
+  S.herd = []; S.zaps = []; S.rushCount = 0; S.combo = 0; S.lastZap = -9; S.rushT = 0;
+  const b = alienBounds(), u = S.ufo;
+  for (let i = 0; i < RUSH_N; i++) {
+    let x, y, tries = 0;
+    do { x = b.x0 + Math.random() * (b.x1 - b.x0); y = b.y0 + Math.random() * Math.max(0, b.y1 - b.y0); tries++; }
+    while (Math.hypot(x - u.x, y - u.y) < 150 * U && tries < 30);
+    const gold = Math.random() < 0.15, base = rollKind().replace('gold', '');
+    S.herd.push({ x, y, vx: 0, vy: 0, dir: Math.random() * Math.PI * 2, turnT: Math.random() * 2, seed: Math.random() * 4, kind: (gold ? 'gold' : '') + base, face: false });
+  }
+  go('rushIntro');
+}
+// 一般外星人和衝刺關共用的移動：隨機換方向、碰邊反彈、飛碟靠近時閃躲
+function moveCreature(al, dt, flee = 0.9) {
+  if (!CFG.alienSpeed) return;
+  const sp = CFG.alienSpeed * U;
+  al.turnT -= dt;
+  if (al.turnT <= 0) { al.dir += (Math.random() - 0.5) * 2.2; al.turnT = 1.2 + Math.random() * 2; }
+  let tx = Math.cos(al.dir) * sp, ty = Math.sin(al.dir) * sp;
+  const dx = al.x - S.ufo.x, dy = al.y - S.ufo.y, d = Math.hypot(dx, dy) || 1, near = 230 * U;
+  if (d < near) { const f = (1 - d / near) * sp * flee; tx += dx / d * f; ty += dy / d * f; }
+  const e = 1 - Math.exp(-dt * 2.5);
+  al.vx = lerp(al.vx, tx, e); al.vy = lerp(al.vy, ty, e);
+  al.x += al.vx * dt; al.y += al.vy * dt;
+  const b = alienBounds();
+  if (al.x < b.x0) { al.x = b.x0; al.dir = Math.PI - al.dir; al.vx = Math.abs(al.vx); }
+  if (al.x > b.x1) { al.x = b.x1; al.dir = Math.PI - al.dir; al.vx = -Math.abs(al.vx); }
+  if (al.y < b.y0) { al.y = b.y0; al.dir = -al.dir; al.vy = Math.abs(al.vy); }
+  if (al.y > b.y1) { al.y = b.y1; al.dir = -al.dir; al.vy = -Math.abs(al.vy); }
+}
+// 抓到一隻：記圖鑑、加分、連擊
+function recordCatch(kind) {
+  S.caught++; $('caught').textContent = S.caught;
+  S.caughtBy[kind] = (S.caughtBy[kind] || 0) + 1;
+  const codex = loadCodex();
+  if (!codex[kind]) { S.newFound.push(kind); setTimeout(() => { pop('NEW!', W / 2, H * 0.18, 'lock'); toast(`📖 New in your collection: ${kindName(kind)}!`, 2800); }, 450); }
+  codex[kind] = (codex[kind] || 0) + 1; saveCodex(codex);
+  $('caught').classList.remove('bump'); void $('caught').offsetWidth; $('caught').classList.add('bump');
+}
+
+// 伸展順序：先轉頭，其餘隨機；左右成對連續做，兩邊平均
+function nextPose() {
+  if (!S.bag.length) {
+    const types = ['tilt', 'lev', 'down'].sort(() => Math.random() - 0.5);
+    if (!S.usedTurn) { types.unshift('turn'); S.usedTurn = true; } else types.splice(Math.floor(Math.random() * 3), 0, 'turn');
+    for (const t of types) {
+      if (t === 'down') S.bag.push('down');
+      else { const lr = Math.random() < 0.5 ? ['L', 'R'] : ['R', 'L']; S.bag.push(t + lr[0], t + lr[1]); }
+    }
+  }
+  return S.bag.shift();
+}
+
+function rel() {
+  const r = S.raw, n = S.neutral || { yaw: 0, pitch: 0, roll: 0, scale: r ? r.scale : 1 };
+  if (!r) return S.ang;
+  S.ang = { yaw: r.yaw - n.yaw, pitch: r.pitch - n.pitch, roll: r.roll - n.roll, scale: r.scale / n.scale };
+  return S.ang;
+}
+const isNeutral = a => Math.abs(a.yaw) < 10 && Math.abs(a.pitch) < 10 && Math.abs(a.roll) < 8;
+function trackMax(a) {
+  const m = S.max;
+  m.turnL = Math.max(m.turnL, -a.yaw); m.turnR = Math.max(m.turnR, a.yaw);
+  m.tiltL = Math.max(m.tiltL, -a.roll); m.tiltR = Math.max(m.tiltR, a.roll);
+  m.down = Math.max(m.down, -a.pitch);
+}
+const breathOf = t => { const k = (t % 8) / 8; return { v: k < 0.5 ? k * 2 : 2 - k * 2, inhale: k < 0.5 }; };
+
+function update(dt) {
+  const a = rel();
+  const needFace = ['setup', 'calib', 'warmTuck', 'fly', 'lock', 'beam', 'ret', 'rushIntro', 'rush'].includes(S.phase);
+
+  // 臉離開鏡頭 → 暫停
+  if (!S.face) S.lostT += dt;
+  const cam = $('cam');
+  cam.classList.toggle('ok', S.face); cam.classList.toggle('lost', !S.face && S.lostT > 0.5);
+  $('camTag').textContent = SIM ? 'SIM' : S.face ? 'ON' : (landmarker ? 'NO FACE' : 'LOADING');
+  const shouldPause = needFace && S.phase !== 'setup' && S.lostT > 0.8;
+  if (shouldPause !== S.paused) { S.paused = shouldPause; $('pause').classList.toggle('hidden', !shouldPause); }
+  if (S.paused) return;
+  S.phaseT += dt;
+  // 抓捕時畫面四周慢慢變暗
+  const focusOn = ['lock', 'beam', 'ret', 'suck'].includes(S.phase);
+  S.focus = lerp(S.focus, focusOn ? 1 : 0, 1 - Math.exp(-dt * 4));
+  S.flash = Math.max(0, S.flash - dt * 1.4);
+
+  switch (S.phase) {
+    case 'setup': {
+      const r = S.raw;
+      const ok = S.face && r && Math.abs(r.cx - 0.5) < 0.18 && r.cy > 0.2 && r.cy < 0.75 && r.w > 0.14;
+      S.setupOk = ok ? (S.setupOk || 0) + dt : 0;
+      if (S.face && r && r.w <= 0.14) center('MOVE CLOSER', 'I can\'t see you clearly.');
+      else if (S.face && !ok) center('CENTER YOUR FACE', 'Fit your face in the oval (bottom right).');
+      else if (ok) center('PERFECT!', 'Hold still…');
+      if (S.setupOk > 1) go('calib');
+      break;
+    }
+    case 'calib': {
+      if (!S.raw) break;
+      S.calib.push({ ...S.raw });
+      const m = S.calib[0]; // 動太多就重來
+      if (S.calib.some(c => Math.abs(c.yaw - m.yaw) > 7 || Math.abs(c.pitch - m.pitch) > 7)) { S.calib = []; S.phaseT = 0; }
+      $('centerSub').innerHTML = `Relax and hold still.<br><span class="num">${Math.max(1, Math.ceil(1.5 - S.phaseT))}</span>`;
+      if (S.phaseT >= 1.5) {
+        const avg = k => S.calib.reduce((s, c) => s + c[k], 0) / S.calib.length;
+        S.neutral = { yaw: avg('yaw'), pitch: avg('pitch'), roll: avg('roll'), scale: avg('scale') };
+        S.calib = []; chime([523, 784], 0.08);
+        if (S.warmUp) go('warmTuck'); else { toast('🛸 Turn your head to chase the alien'); go('fly'); }
+      }
+      break;
+    }
+    case 'warmTuck': {
+      // 跟著節奏做：收 3 秒 → 放鬆 2 秒 × 3 下；偵測只給回饋，不會擋住流程
+      const TUCK = 3, REST = 2, CYCLE = TUCK + REST;
+      const rep = Math.floor(S.phaseT / CYCLE), k = S.phaseT - rep * CYCLE;
+      if (rep >= 3) { chime([880, 1320], 0.08); go('warmShoulder'); break; }
+      const tucking = k < TUCK;
+      const r = clamp((1 - a.scale) / (1 - CFG.tuck), 0, 1.5) * (a.pitch > -18 ? 1 : 0);
+      const good = tucking && r >= 1;
+      if (tucking) countdown(Math.ceil(TUCK - k));
+      else { if (lastCount !== 'rest') chime([660], 0.06); $('cardCount').textContent = ''; lastCount = 'rest'; }
+      $('cardBreath').textContent = `Rep ${rep + 1} of 3 · ` + (tucking ? (good ? 'Nice! Hold it…' : 'Tuck your chin back…') : 'Relax');
+      S.ufo.charge = (rep + Math.min(k / TUCK, 1)) / 3;
+      drawAvatar(null, { pitch: tucking ? -6 : 0 }, (rep + Math.min(k / TUCK, 1)) / 3, good);
+      break;
+    }
+    case 'warmShoulder': {
+      const left = 12 - S.phaseT;
+      countdown(Math.max(1, Math.ceil(left)));
+      // 一圈約 2.4 秒：往上 → 往後 → 往下 → 放鬆，12 秒剛好 5 圈；頭不動、只動肩膀
+      const th = S.phaseT * 2.6;
+      const step = ['Up…', 'Back…', 'Down…', 'Relax…'][Math.floor(((th % (Math.PI * 2)) / (Math.PI * 2)) * 4)];
+      $('cardBreath').textContent = `Shoulders ${step}`;
+      drawAvatar(null, { shoulderUp: (Math.sin(th - Math.PI / 4) * 0.5 + 0.5) * 0.75, shoulderBack: Math.max(0, Math.sin(th - Math.PI * 0.75)) * 0.45 }, S.phaseT / 12, false);
+      if (left <= 0) { toast('🛸 Ready! Turn your head to chase the alien'); chime([523, 659, 784], 0.08); go('fly'); }
+      break;
+    }
+    case 'fly': {
+      tickTimer(dt);
+      const u = S.ufo;
+      flyUFO(a, dt, 1);
+      trackMax(a);
+      moveAlien(dt);
+      if (S.remain <= 0) { go('cool'); break; }
+      if (S.remain <= 10 && !S.finalDone) { S.alien = null; startRush(true); break; } // 最後 10 秒：Final Rush
+      if (S.alien && Math.hypot(u.x - S.alien.x, u.y - (S.alien.y - 50 * U)) < 90 * U) go('lock');
+      break;
+    }
+    case 'lock': {
+      // 飛碟和外星人一起滑到畫面正中間
+      tickTimer(dt);
+      const k = ease(clamp(S.phaseT / CFG.lockTime, 0, 1)), st = stage(), f = S.lockFrom, u = S.ufo, al = S.alien;
+      u.x = lerp(f.ux, st.x, k); u.y = lerp(f.uy, st.uy, k); u.vx *= 0.85; u.vy *= 0.85; u.tilt *= 0.85;
+      al.x = lerp(f.ax, st.x, k); al.y = lerp(f.ay, st.gy, k); al.lift = 0;
+      drawAvatar(POSES[S.pose].target(), a, 0, false);
+      if (S.phaseT >= CFG.lockTime) { S.phase = 'beam'; S.phaseT = 0; }
+      break;
+    }
+    case 'beam': {
+      tickTimer(dt);
+      const st = stage(), u = S.ufo, al = S.alien;
+      u.x = lerp(u.x, st.x, 0.2); u.y = lerp(u.y, st.uy, 0.2); al.x = st.x; al.y = st.gy;
+      const P = POSES[S.pose], r = P.ratio(a);
+      trackMax(a);
+      if (r >= S.assist) { S.hold += dt; S.holdSec[S.pose] = (S.holdSec[S.pose] || 0) + dt; }
+      else if (S.hold < 0.5) S.missT += dt;
+      // 一直做不到 → 慢慢降低門檻，不勉強
+      if (S.missT > 6) { const na = Math.max(CFG.assist, 1 - (S.missT - 6) / 8 * (1 - CFG.assist)); if (S.assist === 1 && na < 1) toast('Just until it feels tight. No need to push.'); S.assist = na; }
+      const prog = clamp(S.hold / CFG.hold, 0, 1);
+      al.lift = prog;
+      setMeter(r, S.assist);
+      countdown(Math.max(1, Math.ceil(CFG.hold - S.hold)));
+      $('cardCount').classList.toggle('dim', r < S.assist); // 沒到位時數字變灰、暫停
+      const b = breathOf(S.beamT += dt);
+      $('cardBreath').textContent = r >= S.assist ? (b.inhale ? 'Breathe in…' : 'Breathe out, relax…') : 'Slowly match the pink outline';
+      drawAvatar(P.target(), a, prog, r >= S.assist);
+      // 光束裡往上飄的光點
+      if (Math.random() < 0.7) S.particles.push({ x: st.x + (Math.random() - 0.5) * 70 * PX / 3, y: st.gy + 20, vy: -(90 + Math.random() * 90), life: 1, tx: st.x });
+      if (prog >= 1) { chime([660, 990], 0.08); go('ret'); }
+      break;
+    }
+    case 'ret': {
+      tickTimer(dt);
+      S.alien.lift = 1;
+      drawAvatar({}, a, 1, isNeutral(a));
+      S.retT = isNeutral(a) ? (S.retT || 0) + dt : 0;
+      if (S.retT > 0.8) { S.retT = 0; go('suck'); }
+      break;
+    }
+    case 'suck': {
+      // 前 55%：外星人被拉成細條吸進去；之後飛碟果凍彈跳＋畫面震動＋星星爆炸
+      const k = S.phaseT / CFG.suckTime;
+      if (k >= 0.55 && !S.sucked) {
+        S.sucked = true;
+        recordCatch(S.alien.kind);
+        S.ufo.springT = performance.now() / 1000; S.shake = 1; S.flash = 0.85;
+        burst(S.ufo.x, S.ufo.y, 100); chime([784, 988, 1175, 1568], 0.06);
+        pop('+1', S.ufo.x, S.ufo.y - 80 * U, 'big');
+      }
+      if (k >= 1) {
+        S.sucked = false; S.alien = null; S.stretches++;
+        card(null);
+        if (S.remain <= 0) go('cool');
+        else if (S.remain <= 10 && !S.finalDone) startRush(true);
+        else if (S.stretches % 2 === 0 && S.remain > 22) startRush(false);
+        else { spawnAlien(); go('fly'); }
+      }
+      break;
+    }
+    case 'rushIntro': {
+      // 3‧2‧1 倒數（這段不扣總時間）
+      const n = Math.ceil(2.4 - S.phaseT);
+      if (n !== S.rushN) { S.rushN = n; if (n > 0) chime([n === 1 ? 1046 : 784], 0.06); }
+      center(S.rushFinal ? 'FINAL RUSH!' : 'ALIEN RUSH!', `Fly into as many as you can in ${RUSH_SEC}s.<br><span class="num">${Math.max(1, n)}</span>`);
+      if (S.phaseT >= 2.4) { center(null); chime([523, 784, 1046], 0.05); S.phase = 'rush'; S.phaseT = 0; $('rushHud').classList.remove('hidden'); $('rushTitle').textContent = S.rushFinal ? 'FINAL RUSH!' : 'ALIEN RUSH!'; }
+      break;
+    }
+    case 'rush': {
+      tickTimer(dt);
+      S.rushT += dt;
+      flyUFO(a, dt, 1.2);
+      trackMax(a);
+      const u = S.ufo, now = performance.now() / 1000;
+      for (const al of S.herd) moveCreature(al, dt, 0.45);
+      // 飛碟碰到就瞬間吸走
+      for (let i = S.herd.length - 1; i >= 0; i--) {
+        const al = S.herd[i];
+        if (Math.hypot(u.x - al.x, u.y - al.y) < 70 * U) {
+          S.herd.splice(i, 1);
+          S.combo = now - S.lastZap < 1.5 ? S.combo + 1 : 1; S.lastZap = now;
+          S.rushCount++; $('rushCount').textContent = S.rushCount;
+          recordCatch(al.kind);
+          S.zaps.push({ ...al, t0: now });
+          burst(al.x, al.y, 24); S.shake = Math.max(S.shake || 0, 0.4);
+          const gold = al.kind.startsWith('gold');
+          chime([660 + Math.min(S.combo, 8) * 110, 990 + Math.min(S.combo, 8) * 110], 0.05);
+          if (gold) chime([1318, 1568, 2093], 0.05);
+          pop(gold ? 'GOLD +1' : '+1', al.x, al.y - 40 * U, 'big');
+          if (S.combo >= 2) pop(`COMBO ×${S.combo}!`, u.x, u.y - 90 * U, 'combo');
+        }
+      }
+      const left = Math.max(0, RUSH_SEC - S.rushT);
+      $('rushTime').textContent = Math.ceil(left);
+      $('rushTime').parentElement.classList.toggle('low', left <= 3);
+      if (left <= 0 || !S.herd.length) {
+        $('rushHud').classList.add('hidden');
+        let best = 0; try { best = +localStorage.getItem('catchAliens.rushBest') || 0; } catch {}
+        const record = S.rushCount > best;
+        if (record) try { localStorage.setItem('catchAliens.rushBest', S.rushCount); } catch {}
+        S.rushBestSession = Math.max(S.rushBestSession || 0, S.rushCount);
+        center(!S.herd.length ? 'CLEARED! 🎉' : `RUSH: ${S.rushCount} CAUGHT!`, record ? '⭐ NEW BEST! ⭐' : `Best: ${Math.max(best, S.rushCount)}`);
+        chime(record ? [523, 659, 784, 1046, 1318] : [523, 659, 784], 0.08);
+        S.phase = 'rushEnd'; S.phaseT = 0;
+      }
+      break;
+    }
+    case 'rushEnd': {
+      if (S.phaseT >= 1.8) {
+        center(null); S.herd = []; S.zaps = [];
+        if (S.rushFinal || S.remain <= 0) go('cool');
+        else { toast('Back to stretching 🛸'); spawnAlien(); go('fly'); }
+      }
+      break;
+    }
+    case 'cool': {
+      const b = breathOf(S.phaseT);
+      $('cardBreath').textContent = b.inhale ? 'Breathe in…' : 'Breathe out…';
+      countdown(Math.max(1, Math.ceil(8 - S.phaseT)), false);
+      drawAvatar(null, { pitch: b.v * 3 }, S.phaseT / 8, true);
+      if (S.phaseT >= 8) go('result');
+      break;
+    }
+  }
+}
+
+function tickTimer(dt) {
+  if (S.remain <= 0) return;
+  const floor = !S.finalDone && ['lock', 'beam', 'ret', 'suck'].includes(S.phase) ? Math.min(10, S.remain) : 0;
+  S.remain = Math.max(floor, S.remain - dt);
+  $('timer').textContent = fmt(S.remain);
+  if (S.remain <= 0 && ['lock', 'beam', 'ret'].includes(S.phase)) toast("Time's up! Finish this last one.");
+}
+
+// ---------- 主迴圈 ----------
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame); // 先排下一格，單格出錯也不會讓遊戲停住
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  try { detect(now); update(dt); render(now / 1000, dt); }
+  catch (err) { console.error(err); }
+}
+
+function render(t, dt) {
+  drawBackground(t, dt);
+  if (S.phase === 'intro') { drawDemo(t); return; }
+  const u = S.ufo, al = S.alien, ph = S.phase;
+  drawFocus(S.focus);
+  // 吞下外星人時畫面震一下
+  S.shake = Math.max(0, (S.shake || 0) - dt * 3.5);
+  ctx.save();
+  if (S.shake > 0) ctx.translate(Math.round((Math.random() - 0.5) * 8 * S.shake), Math.round((Math.random() - 0.5) * 8 * S.shake));
+
+  if (al && ['fly', 'lock', 'beam', 'ret', 'suck'].includes(ph)) {
+    if (ph === 'fly') {
+      if (Math.abs(al.vx) > 8) al.face = al.vx < 0;
+      drawAlien(al.x, al.y + (baseOf(al.kind) === 'cat' ? Math.sin(t * 3 + al.seed) * 3 : 0), t, 1, 0, 0, 1, al.seed, 1, al.kind, al.face, true);
+      drawGuide(t);
+    } else {
+      const top = u.y + 23 * PX, m = CFG.struggle;
+      const b = breathOf(S.beamT).v;
+      if (ph !== 'lock') drawBeam(u.x, u.y, al.x, al.y, t, b, ph === 'suck' ? clamp(1 - S.phaseT / CFG.suckTime, 0, 1) : 1);
+      if (ph === 'lock') {
+        // 被鎖定：嚇一跳、劇烈抖動
+        drawRing(al.x, al.y, clamp(S.phaseT / CFG.lockTime, 0, 1));
+        drawAlien(al.x + Math.sin(t * 40) * 3 * PX * m, al.y - Math.abs(Math.sin(t * 22)) * 3 * PX * m, t, 1, Math.sin(t * 30) * 0.3 * m, 1, 1, al.seed, 1, al.kind, al.face);
+      } else if (ph === 'suck') {
+        // 被拉成細長條「咻」地吸進去
+        const k = clamp(S.phaseT / (CFG.suckTime * 0.55), 0, 1), e = k * k;
+        if (k < 1) drawAlien(u.x, lerp(top, u.y + 6 * PX, e), t, 1, 0, 1, 1 + e * 2.4, al.seed, 1 - e * 0.85, al.kind, al.face);
+      } else if (ph === 'beam') {
+        // 掙扎：左右甩＋身體伸縮，每隔一下用力蹬一次；越接近完成越無力
+        const k = ease(al.lift), ay = lerp(al.y, top, k), mm = (1 - k * 0.6) * m;
+        const dir = Math.sign(Math.sin(t * 2.1)) || 1;
+        const kick = Math.pow(Math.max(0, Math.sin(t * 4.2)), 12);
+        const tilt = (Math.sin(t * 13) * 0.32 + kick * 0.55 * dir) * mm;
+        const jx = (Math.sin(t * 21) * 2 + kick * 5 * dir) * PX * mm;
+        const sy = 1 + (Math.sin(t * 17) * 0.15 + kick * 0.35) * mm, sx = 1 - (Math.sin(t * 17) * 0.1 + kick * 0.18) * mm;
+        drawAlien(al.x + jx, ay - kick * 4 * PX * mm, t, 1, tilt, 1, sy, al.seed, sx, al.kind, al.face, true);
+      } else {
+        // 回正等待中：掛在光束頂端輕輕晃
+        drawAlien(al.x, top + Math.sin(t * 4) * PX, t, 1, Math.sin(t * 3) * 0.08, 0, 1, al.seed, 1, al.kind, al.face);
+      }
+    }
+  }
+  // 衝刺關：一群動物＋被瞬間吸走的動畫
+  if (ph === 'rushIntro' || ph === 'rush' || ph === 'rushEnd') {
+    for (const c of S.herd || []) {
+      if (Math.abs(c.vx) > 8) c.face = c.vx < 0;
+      drawAlien(c.x, c.y + (baseOf(c.kind) === 'cat' ? Math.sin(t * 3 + c.seed) * 3 : 0), t, 1, 0, ph === 'rushIntro' ? 1 : 0, 1, c.seed, 1, c.kind, c.face, ph === 'rush');
+      if (c.kind.startsWith('gold') && Math.random() < 0.25) S.sparks.push({ x: c.x + (Math.random() - 0.5) * 30 * PX, y: c.y + (Math.random() - 0.5) * 24 * PX, vx: 0, vy: -30, life: 0.6, c: '#fff3a8', star: true });
+    }
+    const now = performance.now() / 1000;
+    S.zaps = (S.zaps || []).filter(z => now - z.t0 < 0.3);
+    for (const z of S.zaps) {
+      const k = (now - z.t0) / 0.3;
+      drawBeam(u.x, u.y, z.x, z.y, t, 0, 1 - k);
+      drawAlien(lerp(z.x, u.x, k * k), lerp(z.y, u.y + 8 * PX, k * k), t, 1, 0, 1, 1 + k * 1.5, z.seed, 1 - k * 0.8, z.kind, z.face);
+    }
+  }
+  // 金色稀有：身邊一直冒閃光
+  if (al && al.kind.startsWith('gold') && ['fly', 'lock', 'beam', 'ret'].includes(ph) && Math.random() < 0.35)
+    S.sparks.push({ x: al.x + (Math.random() - 0.5) * 30 * PX, y: al.y + (Math.random() - 0.5) * 24 * PX, vx: 0, vy: -30, life: 0.7, c: Math.random() < 0.5 ? '#fff3a8' : '#ffd84a', star: true });
+  drawParticles(dt);
+  if (ph !== 'result') {
+    // 果凍彈跳：吸入前先被往上拉長（預備動作），吞下後壓扁→彈高→晃幾下
+    let sx = 1, sy = 1;
+    const tt = t - (u.springT ?? -99);
+    if (ph === 'suck' && !S.sucked) { const e = clamp(S.phaseT / (CFG.suckTime * 0.55), 0, 1) ** 2; sy = 1 + 0.25 * e * CFG.bounce; sx = 1 - 0.15 * e * CFG.bounce; }
+    else if (tt >= 0 && tt < 1.2) { const amp = CFG.bounce * Math.exp(-tt * 5) * Math.cos(tt * 26); sy = 1 - 0.45 * amp; sx = 1 + 0.35 * amp; }
+    if (tt >= 0 && tt < 0.45) drawRing(u.x, u.y + 4 * PX, tt / 0.45);
+    drawUFO(u.x, u.y, t, u.tilt, ['beam', 'ret', 'suck', 'rush'].includes(ph) ? 1 : u.charge || 0, sx, sy);
+  }
+  ctx.restore();
+
+  // 收操：飛碟下方的呼吸光圈
+  if (ph === 'cool') {
+    const b = breathOf(S.phaseT).v, r = Math.round(18 + b * 16), X = q(u.x), Y = q(u.y) + 4;
+    ctx.fillStyle = '#6ee7a0';
+    for (let a = 0; a < 80; a++) { const th = a / 80 * Math.PI * 2; if (a % 2) ctx.fillRect(X + Math.round(Math.cos(th) * r * 1.6), Y + Math.round(Math.sin(th) * r * 0.7), 1, 1); }
+  }
+  // 鎖定瞬間白光
+  if (S.flash > 0.6) { ctx.fillStyle = `rgba(255,255,255,${(S.flash - 0.6) * 0.8})`; ctx.fillRect(0, 0, LW, LH); }
+
+  if (!$('panel').classList.contains('hidden')) {
+    const a = S.ang;
+    $('readout').textContent = `turn  (yaw)   ${a.yaw.toFixed(1)}°\nnod   (pitch) ${a.pitch.toFixed(1)}°\ntilt  (roll)  ${a.roll.toFixed(1)}°\nface size     ${(a.scale * 100).toFixed(1)}%`;
+  }
+}
+
+// ---------- 圖鑑儲存 ----------
+function loadCodex() { try { return JSON.parse(localStorage.getItem('catchAliens.codex') || '{}'); } catch { return {}; } }
+function saveCodex(c) { try { localStorage.setItem('catchAliens.codex', JSON.stringify(c)); } catch {} }
+function loadHist() { try { return JSON.parse(localStorage.getItem('catchAliens.history') || '[]'); } catch { return []; } }
+
+function openCodex() {
+  const codex = loadCodex(), found = CODEX.filter(k => codex[k]).length;
+  $('codexFound').innerHTML = `<b>${found} / ${CODEX.length}</b> found`;
+  $('codexGrid').innerHTML = '';
+  for (const k of CODEX) {
+    const n = codex[k] || 0, f = FR[k].idle;
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (k.startsWith('gold') ? ' gold' : '') + (n ? '' : ' locked');
+    const c = document.createElement('canvas'); c.width = 25; c.height = 22;
+    const x = c.getContext('2d'); x.imageSmoothingEnabled = false;
+    x.drawImage(f, Math.round((25 - f.width) / 2), Math.round((22 - f.height) / 2));
+    if (!n) { x.globalCompositeOperation = 'source-in'; x.fillStyle = '#3a3566'; x.fillRect(0, 0, 25, 22); } // 沒抓過 → 剪影
+    cell.appendChild(c);
+    cell.insertAdjacentHTML('beforeend', `<div class="nm">${n ? kindName(k) : '???'}</div><div class="ct">${n ? '×' + n : k.startsWith('gold') ? 'RARE' : '—'}</div>`);
+    $('codexGrid').appendChild(cell);
+  }
+  $('codex').classList.remove('hidden');
+}
+
+// ---------- 連續天數（台北時間的日期） ----------
+const dayKey = d => new Date(d).toLocaleDateString('en-CA');
+function streakOf(hist) {
+  const days = new Set(hist.map(h => dayKey(h.date)));
+  const d = new Date();
+  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1); // 今天還沒玩，從昨天往回算
+  let n = 0;
+  while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function updateStreakLine() {
+  const hist = loadHist(), n = streakOf(hist), today = hist.some(h => dayKey(h.date) === dayKey(Date.now()));
+  $('streakLine').textContent = n ? `🔥 ${n}-day streak` + (today ? ' · done today ✓' : ' · play today to keep it!') : 'Start your streak today 🔥';
+}
+
+// ---------- 進步曲線：最近 7 天，每天取最好一次的平均角度 ----------
+const rangeOf = m => (m.turnL + m.turnR + m.tiltL + m.tiltR + m.down) / 5;
+function drawTrend(hist) {
+  const byDay = new Map();
+  for (const h of hist) { const k = dayKey(h.date); byDay.set(k, Math.max(byDay.get(k) || 0, rangeOf(h.max))); }
+  const pts = [...byDay.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).slice(-7);
+  const c = $('trend'), x = c.getContext('2d'), w = c.width, h = c.height;
+  x.clearRect(0, 0, w, h);
+  // 格線
+  x.fillStyle = '#e2d2b0';
+  for (let gy = 10; gy < h; gy += 12) for (let gx = 0; gx < w; gx += 4) x.fillRect(gx, gy, 2, 1);
+  const vals = pts.map(p => p[1]);
+  const lo = Math.min(...vals) - 4, hi = Math.max(...vals) + 4;
+  const P = (i, v) => [Math.round(pts.length === 1 ? w / 2 : 12 + i * (w - 24) / (pts.length - 1)), Math.round(h - 8 - (v - lo) / Math.max(1, hi - lo) * (h - 16))];
+  // 線（一格一格畫，保持像素感）
+  x.fillStyle = '#5ad1e6';
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = P(i - 1, vals[i - 1]), [x1, y1] = P(i, vals[i]), n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+    for (let k = 0; k <= n; k++) x.fillRect(Math.round(x0 + (x1 - x0) * k / n), Math.round(y0 + (y1 - y0) * k / n), 2, 2);
+  }
+  pts.forEach((p, i) => { const [px, py] = P(i, vals[i]); x.fillStyle = '#231a4f'; x.fillRect(px - 2, py - 2, 5, 5); x.fillStyle = i === pts.length - 1 ? '#ff7aa8' : '#6ee7a0'; x.fillRect(px - 1, py - 1, 3, 3); });
+  const first = Math.round(vals[0]), last = Math.round(vals[vals.length - 1]), diff = last - first;
+  $('trendCap').innerHTML = pts.length < 2
+    ? `Today's average range: <b>${last}°</b>. Come back tomorrow to see your line grow.`
+    : `Average range ${first}° → <b>${last}°</b> over ${pts.length} days` + (diff > 0 ? ` (<b>+${diff}°</b> 🎉)` : diff < 0 ? ' — take it easy, consistency wins.' : '');
+}
+
+// ---------- 結算 ----------
+function showResult() {
+  card(null); $('hud').classList.add('hidden');
+  let hist = [];
+  try { hist = JSON.parse(localStorage.getItem('catchAliens.history') || '[]'); } catch {}
+  const prev = hist[hist.length - 1];
+  const holdTotal = Object.values(S.holdSec).reduce((s, v) => s + v, 0);
+  $('resCaught').textContent = S.caught;
+  $('resHold').textContent = Math.round(holdTotal);
+  const cb = S.caughtBy || {};
+  const parts = CODEX.filter(k => cb[k]).map(k => `${cb[k]} ${kindName(k)}${cb[k] > 1 ? 's' : ''}`);
+  $('resSub').textContent = `${S.duration / 60}-minute mission` + (parts.length ? ' · ' + parts.join(' · ') : '') + (S.rushBestSession ? ` · Best rush: ${S.rushBestSession}` : '');
+  $('resNew').classList.toggle('hidden', !S.newFound.length);
+  $('resNew').textContent = S.newFound.length ? '📖 NEW: ' + S.newFound.map(kindName).join(', ') + '!' : '';
+  const rows = [['turnL', 'Turn left', 60], ['turnR', 'Turn right', 60], ['tiltL', 'Tilt left', 40], ['tiltR', 'Tilt right', 40], ['down', 'Look down', 45]];
+  $('resRows').innerHTML = rows.map(([k, name, full]) => {
+    const v = Math.round(S.max[k]), p = prev ? Math.round(prev.max[k]) : null;
+    const diff = p == null ? '' : (v - p > 0 ? ` ▲${v - p}` : '');
+    return `<div class="row"><span>${name}</span><div class="bar2"><i style="width:${clamp(v / full, 0, 1) * 100}%"></i></div><span class="v ${diff ? 'up' : ''}">${v}°${diff}</span></div>`;
+  }).join('');
+  const tips = ['Now get up, grab some water and walk a bit 🚶', 'Tip: raise your screen to eye level. Your neck will thank you.', 'Come back every hour to catch a few more aliens.', 'Sit tall, like a string is pulling the top of your head up.'];
+  const gap = Math.abs(S.max.turnL - S.max.turnR);
+  $('resTip').textContent = gap > 12 ? `Your left and right turns differ by ${Math.round(gap)}°. Give the tighter side a little extra love. ` + tips[0] : tips[Math.floor(Math.random() * tips.length)];
+  hist.push({ date: new Date().toISOString(), caught: S.caught, hold: holdTotal, max: S.max });
+  try { localStorage.setItem('catchAliens.history', JSON.stringify(hist.slice(-300))); } catch {}
+  const st = streakOf(hist);
+  $('resStreak').textContent = `🔥 ${st}-day streak` + (st >= 3 ? '! Keep it up!' : '');
+  drawTrend(hist);
+  $('result').classList.remove('hidden');
+  chime([523, 659, 784, 1046], 0.12);
+}
+
+// ---------- 按鈕 ----------
+$('durSeg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  [...$('durSeg').children].forEach(x => x.classList.toggle('on', x === b));
+  chime([660], 0.04);
+});
+
+async function begin() {
+  const m = +$('durSeg').querySelector('.on').dataset.m;
+  Object.assign(S, {
+    duration: m * 60, remain: m * 60, caught: 0, caughtBy: {}, newFound: [], warmUp: $('warmChk').checked, stretches: 0, finalDone: false, herd: [], zaps: [], rushBestSession: 0, alien: null, bag: [], usedTurn: false, sucked: false,
+    holdSec: {}, max: { turnL: 0, turnR: 0, tiltL: 0, tiltR: 0, down: 0 }, neutral: null, calib: [], focus: 0,
+  });
+  if (new URLSearchParams(location.search).has('final')) { S.remain = 14; S.warmUp = false; }
+  S.ufo = { x: W / 2, y: H * 0.38, vx: 0, vy: 0, tilt: 0, charge: 0, squash: 0 };
+  $('caught').textContent = 0; $('timer').textContent = fmt(S.remain);
+  $('intro').classList.add('hidden'); $('result').classList.add('hidden'); $('cam').classList.remove('hidden');
+  chime([523, 784], 0.06); // 順便解鎖瀏覽器音效
+  if (!landmarker && !SIM) {
+    center('STARTING…', 'Please allow camera access.');
+    try { await startTracking(); }
+    catch (err) { center('NO CAMERA', 'Allow camera access in your browser, then reload.<br><small>' + (err.message || err) + '</small>'); return; }
+  }
+  go('setup');
+}
+$('startBtn').addEventListener('click', begin);
+$('codexBtn').addEventListener('click', openCodex);
+$('codexBtn2').addEventListener('click', openCodex);
+$('codexClose').addEventListener('click', () => $('codex').classList.add('hidden'));
+$('howBtn').addEventListener('click', () => showSlide(0));
+// 暖身開關：使用者沒動過時，1 分鐘預設關、3／5 分鐘預設開；動過就記住
+let warmPref = null;
+try { const v = localStorage.getItem('catchAliens.warm'); warmPref = v === null ? null : v === '1'; } catch {}
+const syncWarm = () => { const m = +$('durSeg').querySelector('.on').dataset.m; $('warmChk').checked = warmPref ?? m > 1; };
+$('warmChk').addEventListener('change', e => { warmPref = e.target.checked; try { localStorage.setItem('catchAliens.warm', warmPref ? '1' : '0'); } catch {} });
+$('durSeg').addEventListener('click', syncWarm);
+syncWarm();
+$('skipBtn').addEventListener('click', () => {
+  if (S.phase === 'warmTuck') go('warmShoulder');
+  else if (S.phase === 'warmShoulder') go('fly');
+  else if (S.phase === 'beam' || S.phase === 'lock') { toast('Switching pose'); setPose(nextPose()); }
+  else if (S.phase === 'ret') S.retT = 1;
+  else if (S.phase === 'cool') go('result');
+});
+
+// ---------- 調參面板 ----------
+$('sliders').innerHTML = SLIDERS.map(([k, name, min, max, step]) =>
+  `<label>${name}<output id="o_${k}">${CFG[k]}</output><input type="range" id="s_${k}" min="${min}" max="${max}" step="${step}" value="${CFG[k]}"></label>`).join('');
+SLIDERS.forEach(([k]) => $('s_' + k).addEventListener('input', e => { CFG[k] = +e.target.value; $('o_' + k).textContent = CFG[k]; saveCfg(); }));
+$('gear').addEventListener('click', () => $('panel').classList.toggle('hidden'));
+$('resetCfg').addEventListener('click', () => { Object.assign(CFG, DEFAULTS); SLIDERS.forEach(([k]) => { $('s_' + k).value = CFG[k]; $('o_' + k).textContent = CFG[k]; }); saveCfg(); });
+
+// ---------- 靜音 ----------
+const syncMute = () => { $('mute').textContent = muted ? '×' : '♪'; $('mute').title = muted ? 'Sound off' : 'Sound on'; };
+syncMute();
+$('mute').addEventListener('click', () => { muted = !muted; syncMute(); try { localStorage.setItem('catchAliens.muted', muted ? '1' : '0'); } catch {} });
+
+// ---------- 教學分頁 ----------
+const slides = [...document.querySelectorAll('#intro .slide')];
+let slideI = 0;
+$('tutDots').innerHTML = slides.map(() => '<i></i>').join('');
+function showSlide(i) {
+  slideI = clamp(i, 0, slides.length - 1);
+  slides.forEach((el, k) => el.classList.toggle('on', k === slideI));
+  [...$('tutDots').children].forEach((d, k) => d.classList.toggle('on', k === slideI));
+  const lastSlide = slideI === slides.length - 1;
+  $('tutBack').classList.toggle('invisible', slideI === 0);
+  $('tutNext').classList.toggle('invisible', lastSlide);   // 最後一頁用 START 按鈕
+  $('skipTut').classList.toggle('invisible', lastSlide);
+  document.querySelectorAll('.holdSec').forEach(el => el.textContent = CFG.hold);
+  if (lastSlide) { updateStreakLine(); try { localStorage.setItem('catchAliens.seenTutorial', '1'); } catch {} }
+}
+$('tutNext').addEventListener('click', () => { chime([660], 0.04); showSlide(slideI + 1); });
+$('tutBack').addEventListener('click', () => showSlide(slideI - 1));
+$('skipTut').addEventListener('click', () => showSlide(slides.length - 1));
+addEventListener('keydown', e => {
+  if (S.phase !== 'intro' || $('intro').classList.contains('hidden')) return;
+  if (e.key === 'ArrowRight') showSlide(slideI + 1);
+  if (e.key === 'ArrowLeft') showSlide(slideI - 1);
+  if (e.key === 'Enter') slideI === slides.length - 1 ? begin() : showSlide(slideI + 1);
+});
+// 再玩一次：直接回到選時間那頁
+$('againBtn').addEventListener('click', () => { $('result').classList.add('hidden'); $('intro').classList.remove('hidden'); S.phase = 'intro'; S.focus = 0; showSlide(slides.length - 1); });
+
+// 教學頁上的示範小動畫（借用遊戲裡的繪圖函式，畫在 187×100 的像素小螢幕）
+const demoCtx = new Map();
+function drawDemo(t) {
+  const c = slides[slideI].querySelector('canvas.demo');
+  if (!c) return;
+  if (!demoCtx.has(c)) demoCtx.set(c, c.getContext('2d', { willReadFrequently: true }));
+  const dc = demoCtx.get(c), w = c.width, h = c.height;
+  dc.imageSmoothingEnabled = false;
+  dc.fillStyle = '#121547'; dc.fillRect(0, 0, w, h);
+  dc.fillStyle = '#fff3a8';
+  [[12, 10], [40, 30], [70, 8], [150, 14], [172, 40], [120, 60], [20, 70], [160, 82]].forEach(([x, y], i) => { if (Math.sin(t * 2 + i) > -0.4) dc.fillRect(x, y, 1, 1); });
+  const keep = { ctx, PX };
+  const borrow = fn => { ctx = dc; PX = 1; try { fn(); } finally { ctx = keep.ctx; PX = keep.PX; } };
+  const kind = c.dataset.demo;
+
+  if (kind === 'ufo' || kind === 'ready') {
+    // 飛碟用光束把外星人吸上來，循環播放
+    const k = (t * 0.28) % 1, lift = ease(clamp((k - 0.12) / 0.6, 0, 1));
+    const ux = w / 2, uy = 26, gy = h - 18;
+    borrow(() => {
+      if (kind === 'ufo' && k < 0.8) {
+        drawBeam(ux, uy, ux, gy, t, 0.5 + 0.5 * Math.sin(t * 1.6));
+        drawAlien(ux, lerp(gy, uy + 30, lift), t, 1, lift > 0 ? Math.sin(t * 9) * 0.2 * (1 - lift) : 0, lift > 0 ? 1 : 0);
+      }
+      if (kind === 'ready') drawPuff(dc, 20, 78, 0.8), drawPuff(dc, 120, 84, 0.9);
+      drawUFO(ux, kind === 'ready' ? 46 : uy, t, kind === 'ready' ? Math.sin(t) * 0.6 : 0, kind === 'ufo' ? 1 : 0.3);
+    });
+  }
+
+  if (kind === 'steer') {
+    // 左邊頭轉、右邊飛碟跟著動
+    const yaw = Math.sin(t * 1.1) * 35;
+    drawAvatar(null, { yaw }, 0, false, dc, 84, h, 4);
+    const x = 132 + (yaw / 35) * 30;
+    borrow(() => drawUFO(x, 46, t, yaw / 35, 0.3));
+    dc.fillStyle = '#6ee7a0';
+    if (Math.abs(yaw) > 12) {
+      const d = yaw < 0 ? -1 : 1, ax = x + d * 32;
+      for (let i = 0; i < 4; i++) dc.fillRect(ax + d * i - (d < 0 ? 1 : 0), 47 - i, 1, i * 2 + 1);
+    }
+  }
+
+  if (kind === 'hold') {
+    // 歪頭到虛線位置 → 進度環填滿 → 外星人被吸上去
+    const k = (t % 9) / 9, target = { roll: 22 };
+    let roll, prog;
+    if (k < 0.12) { roll = 22 * (k / 0.12); prog = 0; }
+    else if (k < 0.8) { roll = 22; prog = (k - 0.12) / 0.68; }
+    else { roll = 22 * (1 - (k - 0.8) / 0.2); prog = 1; }
+    drawAvatar(target, { roll }, prog, prog > 0 && prog < 1, dc, 90, h, 2);
+    const ux = 138, uy = 22, gy = h - 18, e = ease(prog);
+    borrow(() => {
+      if (k < 0.9) {
+        drawBeam(ux, uy, ux, gy, t, 0.5 + 0.5 * Math.sin(t * 1.6));
+        drawAlien(ux, lerp(gy, uy + 30, e), t, 1, Math.sin(t * 9) * 0.2 * (1 - e), 1);
+      }
+      drawUFO(ux, uy, t, 0, 1);
+    });
+  }
+
+  if (kind === 'easy') {
+    // 慢慢歪頭再回來，旁邊一顆像素愛心
+    const roll = Math.sin(t * 0.9) * 14;
+    drawAvatar(null, { roll }, 0, false, dc, 100, h, 44);
+    const HEART = ['.kk.kk.', 'kppkppk', 'kppppkk', '.kpppk.', '..kpk..', '...k...'];
+    const hb = Math.floor(t * 2) % 2, hx = 140, hy = 30 + hb;
+    HEART.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { dc.fillStyle = ch === 'k' ? '#1a1433' : '#ff7aa8'; dc.fillRect(hx + i * 2, hy + j * 2, 2, 2); } }));
+  }
+  crisp(dc);
+}
+
+// 看過教學的人直接到開始頁
+let seenTut = false;
+try { seenTut = localStorage.getItem('catchAliens.seenTutorial') === '1'; } catch {}
+showSlide(seenTut ? slides.length - 1 : 0);
+window.CA = { CFG, S, POSES, ALIEN_F, COW_F, drawAvatar, startRush };
+
+resize();
+S.ufo = { x: W / 2, y: H * 0.38, vx: 0, vy: 0, tilt: 0, charge: 0, squash: 0 };
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
