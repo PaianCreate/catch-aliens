@@ -927,9 +927,9 @@ function paintUFO(c, X, Y, t, tilt, glow) {
   pxEllipse(c, X + L - 2, Y - 4, 8 - sq, 7 - sq, '#4fa3ef', 'top');
   // 駕駛員（就是你）
   // 駕駛員：綠色外星人（倒蛋頭＋黑色大眼）
-  c.fillStyle = '#7cc46a';
+  c.fillStyle = '#8ee04f';
   c.fillRect(X + L - 1, Y - 10, 3, 1); c.fillRect(X + L - 2, Y - 9, 5, 3); c.fillRect(X + L - 1, Y - 6, 3, 1); c.fillRect(X + L, Y - 5, 1, 1);
-  c.fillStyle = '#10200d'; c.fillRect(X + L - 2, Y - 8, 2, 1); c.fillRect(X + L + 1, Y - 8, 2, 1);
+  c.fillStyle = '#16260f'; c.fillRect(X + L - 2, Y - 8, 2, 1); c.fillRect(X + L + 1, Y - 8, 2, 1);
   // 艙罩反光
   c.fillStyle = '#d6efff';
   c.fillRect(X + L - 9, Y - 7 + sq, 1, 3); c.fillRect(X + L - 8, Y - 9 + sq, 1, 2); c.fillRect(X + L - 6, Y - 11 + sq, 2, 1);
@@ -1052,7 +1052,7 @@ const AV_STYLES = {
        note: '五階明暗、眉骨陰影（目前版本，對照用）' },
   A: { name: 'A · Flat 2-tone', mode: 'flat', skin: '#7cc46a', shade: '#4f9a45', line: '#1b3317', eye: '#0e120d', hi: true, res: 1,
        note: '主色＋一階硬邊陰影，像飛碟的畫法' },
-  B: { name: 'B · Cat palette', mode: 'flat', skin: '#8ee04f', light: '#c6f98f', shade: '#55ad2f', line: '#173a14', eye: '#16260f', hi: true, res: 1,
+  B: { name: 'B · Cat palette ✓ (in use)', mode: 'flat', skin: '#8ee04f', light: '#c6f98f', shade: '#55ad2f', line: '#173a14', eye: '#16260f', hi: true, res: 1,
        note: '直接用外星貓的三個綠：亮／主／暗，和貓是同一家人' },
   C: { name: 'C · Minimal flat', mode: 'flat', skin: '#7cc46a', line: '#1b3317', eye: '#0e120d', hi: false, res: 1,
        note: '單色平塗＋外框，最乾淨的 2D 圖示感' },
@@ -1061,7 +1061,7 @@ const AV_STYLES = {
   E: { name: 'E · Pastel mint', mode: 'flat', skin: '#9de8b8', light: '#d2f7df', shade: '#6cc495', line: '#231a4f', eye: '#231a4f', hi: true, res: 1,
        note: '薄荷綠＋介面同色的深紫外框，和米白視窗最搭' },
 };
-let AV = AV_STYLES[new URLSearchParams(location.search).get('avatar')] || AV_STYLES.S;
+let AV = AV_STYLES[new URLSearchParams(location.search).get('avatar')] || AV_STYLES.B; // 2026-10-24 Paian 選定 B
 const UI_AV_COLORS = ['#ffffff', '#2a2f6a', '#5ad1e6', '#6ee7a0', '#ff7aa8'];
 const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 const paletteOf = st => (st.mode === 'deep'
