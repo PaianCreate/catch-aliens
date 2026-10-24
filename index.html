@@ -1045,6 +1045,28 @@ const av = $('avatar'), actx = av.getContext('2d', { willReadFrequently: true })
 // 明暗五階綠：外框 → 深 → 中（陰影）→ 主色 → 亮 → 高光；光源在左上
 const ALIEN_LINE = '#1b3317', ALIEN_DARK = '#3d7634', ALIEN_MID = '#5a9e4c', ALIEN_SKIN = '#7cc46a', ALIEN_LIGHT = '#a5dd88', ALIEN_HI = '#d6f5c3';
 const ALIEN_EYE = '#0e120d';
+// mode: deep = 五階立體；flat = 平塗（shade 有值就加一階硬邊陰影、light 有值就加一塊亮面）
+// res: 1 = 和其他像素同密度；0.5 = 更粗的 8-bit 大顆粒
+const AV_STYLES = {
+  S: { name: 'Current · 3D shaded', mode: 'deep', skin: ALIEN_SKIN, line: ALIEN_LINE, eye: ALIEN_EYE, hi: true, res: 1,
+       note: '五階明暗、眉骨陰影（目前版本，對照用）' },
+  A: { name: 'A · Flat 2-tone', mode: 'flat', skin: '#7cc46a', shade: '#4f9a45', line: '#1b3317', eye: '#0e120d', hi: true, res: 1,
+       note: '主色＋一階硬邊陰影，像飛碟的畫法' },
+  B: { name: 'B · Cat palette', mode: 'flat', skin: '#8ee04f', light: '#c6f98f', shade: '#55ad2f', line: '#173a14', eye: '#16260f', hi: true, res: 1,
+       note: '直接用外星貓的三個綠：亮／主／暗，和貓是同一家人' },
+  C: { name: 'C · Minimal flat', mode: 'flat', skin: '#7cc46a', line: '#1b3317', eye: '#0e120d', hi: false, res: 1,
+       note: '單色平塗＋外框，最乾淨的 2D 圖示感' },
+  D: { name: 'D · Chunky 8-bit', mode: 'flat', skin: '#8ee04f', shade: '#55ad2f', line: '#173a14', eye: '#16260f', hi: true, res: 0.5,
+       note: '格子放大一倍，像紅白機的大顆粒' },
+  E: { name: 'E · Pastel mint', mode: 'flat', skin: '#9de8b8', light: '#d2f7df', shade: '#6cc495', line: '#231a4f', eye: '#231a4f', hi: true, res: 1,
+       note: '薄荷綠＋介面同色的深紫外框，和米白視窗最搭' },
+};
+let AV = AV_STYLES[new URLSearchParams(location.search).get('avatar')] || AV_STYLES.S;
+const UI_AV_COLORS = ['#ffffff', '#2a2f6a', '#5ad1e6', '#6ee7a0', '#ff7aa8'];
+const hexRGB = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const paletteOf = st => (st.mode === 'deep'
+  ? ['#1b3317', '#3d7634', '#5a9e4c', '#7cc46a', '#a5dd88', '#d6f5c3', '#0e120d']
+  : [st.skin, st.shade, st.light, st.line, st.eye].filter(Boolean)).concat(UI_AV_COLORS).map(hexRGB);
 const headPath = (c, R) => {
   c.beginPath();
   c.moveTo(0, -R);
@@ -1074,6 +1096,26 @@ function drawHead(c, cx, cy, R, p, ghost) {
     // 只描頭型外圈，畫在頭的後面：還沒對上時露出來，對上時被頭蓋住
     c.strokeStyle = '#ff7aa8'; c.lineWidth = lw;
     headPath(c, R); c.stroke();
+  } else if (AV.mode === 'flat') {
+    // 平塗 2D：主色＋（可選）一階硬邊陰影、一塊亮面，不做漸層
+    c.save();
+    headPath(c, R); c.clip();
+    if (AV.shade) {
+      c.fillStyle = AV.shade; c.fillRect(-R * 1.5, -R * 1.5, R * 3, R * 3);
+      c.save(); c.translate(-R * 0.16, -R * 0.12); c.scale(0.93, 0.94); headPath(c, R); c.fillStyle = AV.skin; c.fill(); c.restore();
+    } else { c.fillStyle = AV.skin; c.fillRect(-R * 1.5, -R * 1.5, R * 3, R * 3); }
+    if (AV.light) { c.fillStyle = AV.light; c.beginPath(); c.ellipse(-R * 0.34 + fx * 0.3, -R * 0.58, R * 0.26, R * 0.15, -0.5, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+    headPath(c, R); c.strokeStyle = AV.line; c.lineWidth = lw; c.stroke();
+    for (const d of [-1, 1]) {
+      const far = 1 - Math.max(0, -d * Math.sin(yaw)) * 0.65;
+      const len = R * 0.54 * far, th = R * 0.27 * Math.max(0.5, Math.cos(pitch));
+      almond(c, fx + d * ex, ey, len, th, d);
+      c.fillStyle = AV.eye; c.fill();
+      if (AV.hi) { const hs = Math.max(1, Math.round(R * 0.1)); c.fillStyle = '#ffffff'; c.fillRect(Math.round(fx + d * ex + d * len * 0.12 - hs / 2), Math.round(ey - th * 0.45), hs, hs); }
+    }
+    c.fillStyle = AV.line;
+    c.beginPath(); c.ellipse(fx * 1.1, fy + R * 0.48, R * 0.08, Math.max(1, R * 0.035), 0, 0, Math.PI * 2); c.fill();
   } else {
     // 頭：先鋪深色，再把主色往左上偏移蓋上去 → 右下留下一圈陰影
     c.save();
@@ -1107,29 +1149,31 @@ function drawHead(c, cx, cy, R, p, ghost) {
 }
 const avBufC = document.createElement('canvas'), avBuf = avBufC.getContext('2d', { willReadFrequently: true });
 function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.height, ox = 0, oy = 0) {
-  const cw = c.canvas.width, ch = c.canvas.height;
-  if (avBufC.width !== cw || avBufC.height !== ch) { avBufC.width = cw; avBufC.height = ch; }
-  avBuf.clearRect(0, 0, cw, ch);
-  avBuf.save(); avBuf.translate(0, oy);
+  const cw = c.canvas.width, ch = c.canvas.height, k = AV.res || 1;
+  const bw = Math.ceil(cw * k), bh = Math.ceil(ch * k);
+  if (avBufC.width !== bw || avBufC.height !== bh) { avBufC.width = bw; avBufC.height = bh; }
+  avBuf.clearRect(0, 0, bw, bh);
+  avBuf.save(); avBuf.scale(k, k); avBuf.translate(0, oy);
   paintAvatar(avBuf, target, live, progress, hit, w, h, ox);
   avBuf.restore();
-  pixelize(avBuf);
+  pixelize(avBuf, paletteOf(AV));
   if (c === actx) {
     c.fillStyle = '#121547'; c.fillRect(0, 0, cw, ch);
     c.fillStyle = '#fff3a8'; [[0.08, 0.12], [0.83, 0.2], [0.15, 0.7], [0.9, 0.8], [0.77, 0.08]].forEach(([x, y]) => c.fillRect(Math.round(x * cw), Math.round(y * ch), 1, 1));
   }
-  c.drawImage(avBufC, 0, 0);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(avBufC, 0, 0, bw / k, bh / k);
 }
 // 頭像用到的顏色（像素化時每一格都對齊到最接近的一色）
 const AV_PALETTE = ['#1b3317', '#3d7634', '#5a9e4c', '#7cc46a', '#a5dd88', '#d6f5c3', '#0e120d', '#ffffff', '#2a2f6a', '#5ad1e6', '#6ee7a0', '#ff7aa8']
   .map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
-function pixelize(c) {
+function pixelize(c, pal = AV_PALETTE) {
   const im = c.getImageData(0, 0, c.canvas.width, c.canvas.height), d = im.data;
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] < 110) { d[i + 3] = 0; continue; }
     const r = d[i], g = d[i + 1], b = d[i + 2];
-    let best = AV_PALETTE[0], bd = 1e9;
-    for (const p of AV_PALETTE) { const dd = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2; if (dd < bd) { bd = dd; best = p; } }
+    let best = pal[0], bd = 1e9;
+    for (const p of pal) { const dd = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2; if (dd < bd) { bd = dd; best = p; } }
     d[i] = best[0]; d[i + 1] = best[1]; d[i + 2] = best[2]; d[i + 3] = 255;
   }
   c.putImageData(im, 0, 0);
@@ -1150,6 +1194,14 @@ function paintAvatar(c, target, live, progress, hit, w, h, ox) {
     c.closePath();
   };
   const blw = Math.max(1, Math.round(R * 0.08));
+  if (AV.mode === 'flat') {
+    c.save(); body(); c.clip();
+    c.fillStyle = AV.shade || AV.skin; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
+    if (AV.shade) { c.save(); c.translate(-R * 0.28, 0); body(); c.fillStyle = AV.skin; c.fill(); c.restore(); }
+    if (AV.light) { c.fillStyle = AV.light; c.beginPath(); c.ellipse(cx - R * 0.75 + bk * 0.5, cy + R * 1.62 - up, R * 0.28, R * 0.1, -0.35, 0, Math.PI * 2); c.fill(); }
+    c.restore();
+    body(); c.strokeStyle = AV.line; c.lineWidth = blw; c.stroke();
+  } else {
   // 身體同樣光源：左肩受光、右側陰影
   c.save(); body(); c.clip();
   c.fillStyle = ALIEN_MID; c.fillRect(0, 0, c.canvas.width, c.canvas.height);
@@ -1158,6 +1210,7 @@ function paintAvatar(c, target, live, progress, hit, w, h, ox) {
   c.fillStyle = ALIEN_DARK; c.fillRect(Math.round(cx - R * 0.16), Math.round(cy + R * 0.6), Math.max(1, Math.round(R * 0.1)), Math.round(R * 0.5)); // 下巴在脖子投下的影子
   c.restore();
   body(); c.strokeStyle = ALIEN_LINE; c.lineWidth = blw; c.stroke();
+  }
   // 手臂和身體之間的縫
   c.beginPath();
   for (const d of [-1, 1]) { c.moveTo(cx + d * (R * 0.92 - bk * 0.6), cy + R * 1.75 - up); c.quadraticCurveTo(cx + d * (R * 0.98 - bk * 0.6), h - R * 0.1, cx + d * (R * 0.95 - bk * 0.6), h + 2); }
@@ -1659,6 +1712,7 @@ function frame(now) {
 
 function render(t, dt) {
   drawBackground(t, dt);
+  if (LAB) { drawLab(t); return; }
   if (S.phase === 'intro') { drawDemo(t); return; }
   const u = S.ufo, al = S.alien, ph = S.phase;
   drawFocus(S.focus);
@@ -1931,7 +1985,9 @@ $('againBtn').addEventListener('click', () => { $('result').classList.add('hidde
 const demoCtx = new Map();
 function drawDemo(t) {
   const c = slides[slideI].querySelector('canvas.demo');
-  if (!c) return;
+  if (c) drawDemoScene(c, c.dataset.demo, t);
+}
+function drawDemoScene(c, kind, t) {
   if (!demoCtx.has(c)) demoCtx.set(c, c.getContext('2d', { willReadFrequently: true }));
   const dc = demoCtx.get(c), w = c.width, h = c.height;
   dc.imageSmoothingEnabled = false;
@@ -1940,7 +1996,6 @@ function drawDemo(t) {
   [[10, 8], [33, 25], [58, 6], [125, 12], [143, 33], [100, 50], [17, 58], [133, 68]].forEach(([x, y], i) => { if (Math.sin(t * 2 + i) > -0.4) dc.fillRect(x, y, 1, 1); });
   const keep = { ctx, PX };
   const borrow = fn => { ctx = dc; PX = 1; try { fn(); } finally { ctx = keep.ctx; PX = keep.PX; } };
-  const kind = c.dataset.demo;
 
   if (kind === 'ufo' || kind === 'ready') {
     // 飛碟用光束把外星人吸上來，循環播放
@@ -1959,8 +2014,8 @@ function drawDemo(t) {
   if (kind === 'steer') {
     // 左邊頭轉、右邊飛碟跟著動
     const yaw = Math.sin(t * 1.1) * 35;
-    drawAvatar(null, { yaw }, 0, false, dc, 60, 50, 4, h - 50);
-    const x = 112 + Math.round((yaw / 35) * 12);
+    drawAvatar(null, { yaw }, 0, false, dc, 66, h, 0);
+    const x = 114 + Math.round((yaw / 35) * 12);
     borrow(() => drawUFO(x, 40, t, yaw / 35, 0.3));
     dc.fillStyle = '#6ee7a0';
     if (Math.abs(yaw) > 12) {
@@ -1976,7 +2031,7 @@ function drawDemo(t) {
     if (k < 0.12) { roll = 22 * (k / 0.12); prog = 0; }
     else if (k < 0.8) { roll = 22; prog = (k - 0.12) / 0.68; }
     else { roll = 22 * (1 - (k - 0.8) / 0.2); prog = 1; }
-    drawAvatar(target, { roll }, prog, prog > 0 && prog < 1, dc, 60, 50, 4, h - 50);
+    drawAvatar(target, { roll }, prog, prog > 0 && prog < 1, dc, 72, h, 0);
     const ux = 116, uy = 18, gy = h - 14, e = ease(prog);
     borrow(() => {
       if (k < 0.9) {
@@ -1990,13 +2045,50 @@ function drawDemo(t) {
   if (kind === 'easy') {
     // 慢慢歪頭再回來，旁邊一顆像素愛心（1 格 = 1 像素，和其他東西一樣大）
     const roll = Math.sin(t * 0.9) * 14;
-    drawAvatar(null, { roll }, 0, false, dc, 60, 50, 48, h - 50);
+    drawAvatar(null, { roll }, 0, false, dc, 84, h, 22);
     const HEART = ['.kkk...kkk.', 'kpppk.kpppk', 'kpwpppppppk', 'kpppppppppk', '.kpppppppk.', '..kpppppk..', '...kpppk...', '....kpk....', '.....k.....'];
-    const hx = 118, hy = 26 + Math.floor(t * 2) % 2;
+    const hx = 122, hy = 26 + Math.floor(t * 2) % 2;
     const HC = { k: '#1a1433', p: '#ff7aa8', w: '#ffffff' };
     HEART.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { dc.fillStyle = HC[ch]; dc.fillRect(hx + i, hy + j, 1, 1); } }));
   }
   crisp(dc);
+}
+
+// ---------- 外星人風格比較頁（網址加 ?styles） ----------
+const LAB = new URLSearchParams(location.search).has('styles');
+const labItems = [];
+if (LAB) {
+  $('intro').classList.add('hidden');
+  const sec = document.createElement('section');
+  sec.className = 'overlay'; sec.style.alignItems = 'flex-start';
+  sec.innerHTML = `<div style="width:min(1000px,100%)">
+    <div class="win" style="margin-bottom:16px"><div class="bar"><i></i><i></i><i></i><span>ALIEN STYLE LAB</span></div>
+      <div class="win-body" style="font-size:17px;line-height:1.5">挑一款最接近外星貓和飛碟的外星人畫法。每款都用一樣的像素大小，左邊是教學示範，右邊是姿勢卡尺寸。</div></div>
+    <div id="labGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,${156 * 3 + 40}px),1fr));gap:16px"></div></div>`;
+  document.body.appendChild(sec);
+  for (const key of Object.keys(AV_STYLES)) {
+    const st = AV_STYLES[key];
+    const box = document.createElement('div'); box.className = 'win';
+    box.innerHTML = `<div class="bar"><i></i><i></i><i></i><span>${st.name.toUpperCase()}</span></div>
+      <div class="win-body" style="text-align:center">
+        <canvas class="demo" width="156" height="84"></canvas>
+        <div style="display:flex;gap:14px;align-items:center;justify-content:center">
+          <canvas width="60" height="50" style="width:calc(60 * var(--u));height:calc(50 * var(--u));image-rendering:pixelated;border:var(--u) solid var(--line);background:var(--sky)"></canvas>
+          <p style="margin:0;font-size:16px;text-align:left;max-width:200px">${st.note}</p>
+        </div></div>`;
+    $('labGrid').appendChild(box);
+    const [demo, cardC] = box.querySelectorAll('canvas');
+    labItems.push({ st, demo, card: cardC.getContext('2d', { willReadFrequently: true }) });
+  }
+}
+function drawLab(t) {
+  const keepAV = AV;
+  for (const it of labItems) {
+    AV = it.st;
+    drawDemoScene(it.demo, 'hold', t);
+    drawAvatar(null, { yaw: Math.sin(t * 1.1) * 30 }, (t * 0.12) % 1, false, it.card, 60, 50, 0);
+  }
+  AV = keepAV;
 }
 
 // 看過教學的人直接到開始頁
