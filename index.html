@@ -72,7 +72,7 @@
   /* ===== 伸展姿勢卡 ===== */
   #card { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 11; width: min(700px, calc(100vw - 32px)); }
   #card .card-body { display: flex; gap: 16px; align-items: center; padding: 14px 18px 14px 14px; }
-  #card canvas { width: 168px; height: 140px; flex: none; image-rendering: pixelated; border: 3px solid var(--line); }
+  #card canvas { width: 180px; height: 150px; flex: none; image-rendering: pixelated; border: 3px solid var(--line); }
   #card .txt { flex: 1; min-width: 0; }
   #card h3 { margin: 0 0 4px; font-size: 27px; font-weight: 700; line-height: 1.15; }
   #card p { margin: 0; font-size: 17px; line-height: 1.35; }
@@ -201,7 +201,7 @@
     #cam .cam-body { height: 84px; }
     #hud { top: 12px; left: 12px; gap: 18px; }
     #card .card-body { flex-wrap: wrap; justify-content: center; gap: 10px; padding: 12px; }
-    #card canvas { width: 132px; height: 110px; }
+    #card canvas { width: 120px; height: 100px; }
     #card .txt { flex-basis: 100%; text-align: center; order: 3; }
     #card .count { min-width: 0; font-size: 26px; }
     #card h3 { font-size: 22px; }
@@ -239,7 +239,7 @@
 <div id="card" class="win hidden">
   <div class="bar"><i></i><i></i><i></i><span id="cardStep"></span><button id="skipBtn">SKIP ›</button></div>
   <div class="card-body">
-    <canvas id="avatar" width="120" height="100"></canvas>
+    <canvas id="avatar" width="60" height="50"></canvas>
     <div class="txt">
       <h3 id="cardTitle"></h3>
       <p id="cardTip"></p>
@@ -1067,12 +1067,35 @@ function drawHead(c, cx, cy, R, p, ghost) {
   }
   c.restore();
 }
+const avBufC = document.createElement('canvas'), avBuf = avBufC.getContext('2d', { willReadFrequently: true });
 function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.height, ox = 0) {
-  const cx = ox + w / 2, cy = h * 0.46, R = h * 0.26;
+  const cw = c.canvas.width, ch = c.canvas.height;
+  if (avBufC.width !== cw || avBufC.height !== ch) { avBufC.width = cw; avBufC.height = ch; }
+  avBuf.clearRect(0, 0, cw, ch);
+  paintAvatar(avBuf, target, live, progress, hit, w, h, ox);
+  pixelize(avBuf);
   if (c === actx) {
-    c.fillStyle = '#121547'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#fff3a8'; [[10, 12], [100, 20], [18, 70], [108, 80], [92, 8]].forEach(([x, y]) => c.fillRect(x, y, 1, 1));
+    c.fillStyle = '#121547'; c.fillRect(0, 0, cw, ch);
+    c.fillStyle = '#fff3a8'; [[0.08, 0.12], [0.83, 0.2], [0.15, 0.7], [0.9, 0.8], [0.77, 0.08]].forEach(([x, y]) => c.fillRect(Math.round(x * cw), Math.round(y * ch), 1, 1));
   }
+  c.drawImage(avBufC, 0, 0);
+}
+// 頭像用到的顏色（像素化時每一格都對齊到最接近的一色）
+const AV_PALETTE = ['#7cbf6b', '#1b3317', '#141a12', '#b9dca9', '#2a2f6a', '#5ad1e6', '#6ee7a0', '#ff7aa8']
+  .map(h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)));
+function pixelize(c) {
+  const im = c.getImageData(0, 0, c.canvas.width, c.canvas.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 110) { d[i + 3] = 0; continue; }
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    let best = AV_PALETTE[0], bd = 1e9;
+    for (const p of AV_PALETTE) { const dd = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2; if (dd < bd) { bd = dd; best = p; } }
+    d[i] = best[0]; d[i + 1] = best[1]; d[i + 2] = best[2]; d[i + 3] = 255;
+  }
+  c.putImageData(im, 0, 0);
+}
+function paintAvatar(c, target, live, progress, hit, w, h, ox) {
+  const cx = ox + w / 2, cy = h * 0.46, R = h * 0.26;
   // 身體：細脖子往下變寬成斜肩，手臂垂在兩側（和參考圖一樣是一整片輪廓）
   // 繞肩示範：up = 肩膀抬高多少、back = 往後收（肩寬變窄）
   const up = (live.shoulderUp || 0) * R, bk = (live.shoulderBack || 0) * R;
@@ -1110,7 +1133,6 @@ function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.
       c.restore();
     }
   }
-  if (c === actx) crisp(c);
 }
 // 把反鋸齒的半透明邊緣去掉，讓小頭像也是硬邊像素
 function crisp(c) {
