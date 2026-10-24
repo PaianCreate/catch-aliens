@@ -33,6 +33,8 @@
   .hidden { display: none !important; }
   .invisible { visibility: hidden !important; }
   button { font-family: inherit; cursor: pointer; }
+  button:focus { outline: none; }
+  button:focus-visible { outline: var(--u) solid var(--yellow); outline-offset: var(--u); }
 
   /* ===== 像素視窗（米白底＋粉紅標題列） ===== */
   .win { background: var(--cream); border: var(--u) solid var(--line); box-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 rgba(8, 6, 30, .55); }
@@ -1069,10 +1071,9 @@ function drawHead(c, cx, cy, R, p, ghost) {
   const fx = Math.sin(yaw) * R * 0.5, fy = -Math.sin(pitch) * R * 0.42;
   const ex = Math.cos(yaw) * R * 0.31, ey = fy + R * 0.06;
   if (ghost) {
-    c.setLineDash([lw * 2, lw * 2]); c.strokeStyle = '#ff7aa8'; c.lineWidth = lw;
+    // 只描頭型外圈，畫在頭的後面：還沒對上時露出來，對上時被頭蓋住
+    c.strokeStyle = '#ff7aa8'; c.lineWidth = lw;
     headPath(c, R); c.stroke();
-    for (const d of [-1, 1]) { const far = 1 - Math.max(0, -d * Math.sin(yaw)) * 0.65; almond(c, fx + d * ex, ey, R * 0.54 * far, R * 0.27, d); c.stroke(); }
-    c.setLineDash([]);
   } else {
     // 頭：先鋪深色，再把主色往左上偏移蓋上去 → 右下留下一圈陰影
     c.save();
@@ -1105,11 +1106,13 @@ function drawHead(c, cx, cy, R, p, ghost) {
   c.restore();
 }
 const avBufC = document.createElement('canvas'), avBuf = avBufC.getContext('2d', { willReadFrequently: true });
-function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.height, ox = 0) {
+function drawAvatar(target, live, progress, hit, c = actx, w = av.width, h = av.height, ox = 0, oy = 0) {
   const cw = c.canvas.width, ch = c.canvas.height;
   if (avBufC.width !== cw || avBufC.height !== ch) { avBufC.width = cw; avBufC.height = ch; }
   avBuf.clearRect(0, 0, cw, ch);
+  avBuf.save(); avBuf.translate(0, oy);
   paintAvatar(avBuf, target, live, progress, hit, w, h, ox);
+  avBuf.restore();
   pixelize(avBuf);
   if (c === actx) {
     c.fillStyle = '#121547'; c.fillRect(0, 0, cw, ch);
@@ -1159,6 +1162,7 @@ function paintAvatar(c, target, live, progress, hit, w, h, ox) {
   c.beginPath();
   for (const d of [-1, 1]) { c.moveTo(cx + d * (R * 0.92 - bk * 0.6), cy + R * 1.75 - up); c.quadraticCurveTo(cx + d * (R * 0.98 - bk * 0.6), h - R * 0.1, cx + d * (R * 0.95 - bk * 0.6), h + 2); }
   c.stroke();
+  if (target) drawHead(c, cx, cy, R, target, true);
   drawHead(c, cx, cy, R, live, false);
   // 外圈進度環
   const rr = R * 1.5, lw = Math.max(2, Math.round(R * 0.14));
@@ -1166,7 +1170,6 @@ function paintAvatar(c, target, live, progress, hit, w, h, ox) {
   c.strokeStyle = '#2a2f6a'; c.beginPath(); c.arc(cx, cy, rr, 0, Math.PI * 2); c.stroke();
   if (progress > 0) { c.strokeStyle = hit ? '#6ee7a0' : '#5ad1e6'; c.beginPath(); c.arc(cx, cy, rr, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress); c.stroke(); }
   if (target) {
-    drawHead(c, cx, cy, R, target, true);
     // 粉紅箭頭：要往哪邊動（到位後消失）
     const dx = (target.yaw || 0) / 35 + (target.roll || 0) / 30, dy = -(target.pitch || 0) / 25;
     if (Math.hypot(dx, dy) > 0.1 && !hit && Math.floor(performance.now() / 300) % 2) {
@@ -1956,8 +1959,8 @@ function drawDemo(t) {
   if (kind === 'steer') {
     // 左邊頭轉、右邊飛碟跟著動
     const yaw = Math.sin(t * 1.1) * 35;
-    drawAvatar(null, { yaw }, 0, false, dc, 66, h, 0);
-    const x = 114 + Math.round((yaw / 35) * 12);
+    drawAvatar(null, { yaw }, 0, false, dc, 60, 50, 4, h - 50);
+    const x = 112 + Math.round((yaw / 35) * 12);
     borrow(() => drawUFO(x, 40, t, yaw / 35, 0.3));
     dc.fillStyle = '#6ee7a0';
     if (Math.abs(yaw) > 12) {
@@ -1973,7 +1976,7 @@ function drawDemo(t) {
     if (k < 0.12) { roll = 22 * (k / 0.12); prog = 0; }
     else if (k < 0.8) { roll = 22; prog = (k - 0.12) / 0.68; }
     else { roll = 22 * (1 - (k - 0.8) / 0.2); prog = 1; }
-    drawAvatar(target, { roll }, prog, prog > 0 && prog < 1, dc, 72, h, 0);
+    drawAvatar(target, { roll }, prog, prog > 0 && prog < 1, dc, 60, 50, 4, h - 50);
     const ux = 116, uy = 18, gy = h - 14, e = ease(prog);
     borrow(() => {
       if (k < 0.9) {
@@ -1987,10 +1990,11 @@ function drawDemo(t) {
   if (kind === 'easy') {
     // 慢慢歪頭再回來，旁邊一顆像素愛心（1 格 = 1 像素，和其他東西一樣大）
     const roll = Math.sin(t * 0.9) * 14;
-    drawAvatar(null, { roll }, 0, false, dc, 84, h, 22);
-    const HEART = ['.kk.kk.', 'kppkppk', 'kppppkk', '.kpppk.', '..kpk..', '...k...'];
-    const hx = 124, hy = 24 + Math.floor(t * 2) % 2;
-    HEART.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { dc.fillStyle = ch === 'k' ? '#1a1433' : '#ff7aa8'; dc.fillRect(hx + i, hy + j, 1, 1); } }));
+    drawAvatar(null, { roll }, 0, false, dc, 60, 50, 48, h - 50);
+    const HEART = ['.kkk...kkk.', 'kpppk.kpppk', 'kpwpppppppk', 'kpppppppppk', '.kpppppppk.', '..kpppppk..', '...kpppk...', '....kpk....', '.....k.....'];
+    const hx = 118, hy = 26 + Math.floor(t * 2) % 2;
+    const HC = { k: '#1a1433', p: '#ff7aa8', w: '#ffffff' };
+    HEART.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.') { dc.fillStyle = HC[ch]; dc.fillRect(hx + i, hy + j, 1, 1); } }));
   }
   crisp(dc);
 }
